@@ -1,0 +1,28 @@
+<Project>
+
+  <PropertyGroup>
+    <!--
+      The app targets .NET 10 (LTS) and builds with any SDK >= 10 (see global.json). The C# version and the analyzer
+      rule set are tied to .NET 10, so a newer SDK does not raise new warnings that would fail the build.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Symbols live inside the assemblies: published apps are a single file, stack traces keep line numbers. -->
+    <DebugType>embedded</DebugType>
+
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!--
+      NuGet vulnerability audit stays visible but does not fail the build: new advisories appear over time,
+      and a clean checkout must keep building later on any machine. Fix them by updating the SDK or packages.
+    -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- Comparison is ordinal over UTF-8 bytes, so no culture data is needed. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+</Project>

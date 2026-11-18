@@ -1,0 +1,20 @@
+schema: spec-driven
+
+# Constraints an agent cannot infer from the code. General documentation lives in CLAUDE.md and README.md.
+context: |
+  Take-home programming assignment. It requires C#; the solution targets .NET 10 (LTS).
+  Acceptance targets: a 1 GB file sorts in under 1 minute using about 2 GB of memory or less, both at the same time;
+  the sorter must handle inputs of ~100 GB. The hardware it will be evaluated on is unknown, so keep a wide margin on
+  both targets.
+  Correctness comes first, then time and memory, then code quality.
+  Write all artifacts in English.
+
+rules:
+  proposal:
+    - State assumptions and what is out of scope explicitly.
+  design:
+    - Back every performance decision with a measurement, or name the measurement that will decide it.
+    - Account for memory explicitly (data buffers, line index, I/O buffers) against the 2 GB budget.
+  tasks:
+    - End every task with a concrete verification step (a test, a benchmark or a checker run).
+    - Include updating README.md whenever a task changes behavior, assumptions or measured results.

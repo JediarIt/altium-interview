@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <!--
+    `dotnet build` / `dotnet run` produce a regular framework-dependent app that runs on the JIT.
+    `dotnet publish -r <rid>` produces one self-contained executable that runs without .NET installed (e.g. on a QA
+    machine), for any target OS, from any build machine.
+  -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+  </PropertyGroup>
+
+</Project>

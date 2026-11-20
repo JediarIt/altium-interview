@@ -12,9 +12,14 @@ context: |
 rules:
   proposal:
     - State assumptions and what is out of scope explicitly.
+  specs:
+    - State only the contract, that is, what users and the other programs rely on. Small details (accepted ranges,
+      console protocol, message texts) are written once, in design.md, and live in the code and `--help` after
+      implementation.
   design:
     - Back every performance decision with a measurement, or name the measurement that will decide it.
     - Account for memory explicitly (data buffers, line index, I/O buffers) against the 2 GB budget.
   tasks:
     - End every task with a concrete verification step (a test, a benchmark or a checker run).
     - Include updating README.md whenever a task changes behavior, assumptions or measured results.
+    - Refer to requirements, scenarios and design decisions by name or id instead of repeating their values.

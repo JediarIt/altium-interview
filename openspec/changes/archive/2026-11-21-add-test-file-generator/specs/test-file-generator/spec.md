@@ -100,8 +100,9 @@ coincide by chance, so short Strings repeat more often than the option says.
 - **THEN** it contains at most 1024 distinct Strings
 
 ### Requirement: String length in words
-`--words <min>-<max>` (default `1-5`) SHALL set how many words a String has: a whole number chosen uniformly from
-the range for each String. A single number means exactly that many words.
+`--words <min>-<max>` (default `1-5`) SHALL set how many words a String has: a whole number chosen at random from the
+range for each String, unless the `empty` edge case leaves the String empty. A single number means exactly that many
+words.
 
 #### Scenario: Range of words
 - **WHEN** a file of 1 MB is generated with `--words 2-3`
@@ -129,8 +130,8 @@ of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
 
 #### Scenario: Category case
 - **WHEN** a file of 1 MB is generated with `--edge-cases case`
-- **THEN** words occur in lower case, capitalized and in upper case, in any position: some Strings begin with a
-  lower-case letter, and some have an upper-case letter after the first word
+- **THEN** dictionary words occur in lower case, capitalized and in upper case, in any position: some Strings begin
+  with a lower-case ASCII letter, and some have an upper-case ASCII letter after the first word
 
 #### Scenario: Category big-numbers
 - **WHEN** a file of 1 MB is generated with `--edge-cases big-numbers`
@@ -155,7 +156,9 @@ of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
 
 ### Requirement: Line ending
 `--line-ending` SHALL accept `lf` (the default on every operating system) or `crlf` and SHALL set the line ending of
-the output, `\n` or `\r\n`, in the sense of the `line-format` capability.
+the output, `\n` or `\r\n`, in the sense of the `line-format` capability. A carriage return SHALL appear in the output
+only as part of a `\r\n` terminator, never inside a String, so the line ending of a generated file can be told from
+any of its lines.
 
 #### Scenario: Default on Windows
 - **WHEN** a file is generated on Windows without `--line-ending`
@@ -163,7 +166,8 @@ the output, `\n` or `\r\n`, in the sense of the `line-format` capability.
 
 #### Scenario: Carriage return and line feed
 - **WHEN** a file is generated with `--line-ending crlf`
-- **THEN** every line is followed by `\r\n`, and no line feed appears without a carriage return before it
+- **THEN** every line is followed by `\r\n`, no line feed appears without a carriage return before it, and no
+  carriage return appears without a line feed after it
 
 ### Requirement: Deterministic output
 The bytes of the output SHALL depend only on the seed, on `--size`, `--duplicates`, `--words`, `--edge-cases` and
@@ -264,6 +268,21 @@ message on standard error that names the cause. A stack trace SHALL NOT be shown
 #### Scenario: Unwritable output path
 - **WHEN** the output path is a directory or cannot be written
 - **THEN** the generator exits with code 1 with a message that names the path and shows no stack trace
+
+### Requirement: Settings before the run
+Before generation starts, the generator SHALL print to standard error the settings it works with: every option with
+its value, whether or not the user gave it, and the seed, also when the generator chose it. A redirected standard
+error still gets them.
+
+#### Scenario: Options that were not given
+- **WHEN** the generator is run with only `--output` and `--size`
+- **THEN** before any progress it prints to standard error the output path, the requested size, the seed it chose,
+  and the values of `--duplicates`, `--words`, `--edge-cases`, `--line-ending`, `--threads`, the write mode,
+  `--overwrite` and the content version
+
+#### Scenario: A run that does not finish
+- **WHEN** a run is cancelled or fails after generation has started
+- **THEN** its settings, the seed included, have already been printed
 
 ### Requirement: Progress and summary
 The generator SHALL show its progress on standard error unless that stream is redirected; then it SHALL write no

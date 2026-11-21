@@ -4,6 +4,8 @@
     <OutputType>Exe</OutputType>
     <!-- Keeps the trimming, single-file and AOT analyzers on, so the code stays safe for every publish mode. -->
     <IsAotCompatible>true</IsAotCompatible>
+    <!-- Only for AlignedBuffer: unbuffered writes need memory aligned to the sector size. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!--
@@ -17,7 +19,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileSort.Tests" />
+    <InternalsVisibleTo Include="FileSort.Benchmarks" />
   </ItemGroup>
 
 </Project>

@@ -265,8 +265,9 @@ the oldest one, hands its block to the sink, recycles the buffer and starts the 
 of waiting, parallelism from the tasks, and the bound on memory from the size of the window. When the sink is slower
 than generation, finished blocks wait and no new work starts, which is the backpressure.
 
-The sink is an interface with three implementations, each with a real user: the file sink (D11), an in-memory hashing
-sink (tests check determinism without a disk), and a discarding sink (benchmarks measure generation alone).
+The sink is an interface. The program has one implementation, the file sink (D11). The other two are test doubles and
+live with their users, outside the program: an in-memory hashing sink in the tests (they check determinism without a
+disk), and a discarding sink in the benchmarks (they measure generation alone) and in the pipeline tests.
 
 Block buffers are allocated once, `threads + 1` of them, and recycled. One `Task` per block (per megabyte) is the only
 allocation in steady state. Tasks run on the thread pool, whose minimum size is the number of logical processors, so
@@ -421,7 +422,7 @@ the block generator with zero allocated bytes per block; the pipeline adds one `
 
 - `FileSort.Common`: format constants, `LineEnding`, line writer.
 - `FileSort.Generator`: PRNG; dictionary; content options (the recipe); repeat pool; block generator; pipeline and
-  sinks; file sink with the aligned buffer and the temporary file lifecycle; value parsers for sizes and ranges;
+  the sink interface; file sink with the aligned buffer and the temporary file lifecycle; value parsers for sizes and ranges;
   the command definition; progress and summary; `Program`. Types are internal and visible to the tests and the
   benchmarks through `InternalsVisibleTo`. No separate library: `CLAUDE.md` asks for an engine library for the
   sorter only, and nothing else consumes the generator's code.
@@ -474,3 +475,109 @@ the simulation of D6, the ordering probe of D8 and the `System.Random` fingerpri
 
 None for this change. D2 leaves one decision to the changes of the checker and the sorter: how each of them learns
 the line ending of a file it reads.
+
+## Changes during implementation
+
+The decisions above are the plan as it was reviewed, and they stay as written. The implementation departed from
+them where a measurement or a review gave a reason; this section lists every departure. Where this document and
+the code differ, the code, its tests and the READMEs are right. The measurements are in
+`FileSort.Generator/README.md`; each item ends with the subsection of its section Performance, or the section, that
+holds them.
+
+- **The README was split.** The root `README.md` is the overview. The generator's options table, behaviour,
+  measurements, design decisions and limitations are in `FileSort.Generator/README.md`. Where D13, D16 or
+  `tasks.md` place those parts in "the README", they are in that file now, and the test of D13 reads the options
+  table from it (linked into the test output as `FileSort.Generator.README.md`).
+- **D1, D15: no line writer in `FileSort.Common`.** Common holds `LineFormat` (the separator, the line feed and
+  carriage return bytes, the two limits of a Number and the byte order mark), `LineEnding` and
+  `LineEndingExtensions`. `LineWriter` is internal to the generator (`Content/Lines`) and has no method that
+  writes a whole line: the generator is the only program that composes lines, and the sorter copies them as bytes.
+  The requirement "Canonical form of a written line" is about bytes and is unaffected. If the sorter ever needs to
+  compose a line, the writer moves back.
+- **D9, M1: Numbers are written without a digit loop.** Neither planned variant was kept for plain Numbers (at most
+  32 bits, no leading zeros). They are written by `PlainNumberWriter`, which computes every digit at once: 8.59 ns
+  against 15.93 ns for `Utf8Formatter`, because the length of a Number is random and a digit loop mispredicts on
+  almost every line. The rare Numbers of `big-numbers` and `leading-zeros` go through `Utf8Formatter`; a
+  hand-written digit loop measured 19.4 ns and was removed. Words are copied as fixed 16-byte slots (2.10 against
+  6.76 ns), so the dictionary is expanded into a table of slots when it is first used. Bit operations sit behind
+  small named methods (`RandomBits`, and the parts of `PlainNumberWriter`); the JIT listing shows them inlined. The
+  capital letter of a String is set with one exclusive or, 2.25 ns against 5.30 ns for `Ascii.ToUpperInPlace`. The
+  hot path; Design decisions.
+- **D4, rule 3** holds in substance, not word for word: `PlainNumberWriter` packs digits into an integer, but stores
+  it with an explicit little-endian write, so the bytes still do not depend on the byte order of the processor.
+- **D11, M3: the unbuffered chunk is 16 MiB, not 8 MiB.** In three runs per size 16 MiB was about 8% faster than
+  8 MiB; 32 MiB added 5% more and is not used. The buffered chunk is 1 MiB. The write path.
+- **D11: the reason for one writer changed.** The probes behind "several writers were slower than one" gave each
+  writer a region of one preallocated file, and NTFS fills the gap between the valid data length and a write with
+  zeros first. With a file per writer, 4 or 8 writers take about 3.1 GiB/s against 2.2 to 2.5 for one. One writer
+  stays, because the output is one file that grows from its start. M3 measures both layouts. The write path.
+- **D11, M4: the file sink has two chunk buffers and a writer thread of its own**, in both write modes. A sink with
+  one buffer reached 78% to 80% of the raw write, under the threshold of 90%, so the rule of D11 applied: the caller
+  copies blocks into one buffer while the writer thread writes the other. The thread is dedicated rather than a
+  thread-pool task by reasoning, not by measurement: a write must not queue behind the blocks being generated. The
+  sink measured between 67% and 99% of the raw write, most runs at 86% or more; the cause of the slow runs was not
+  found. The file sink.
+- **D12: more checks before the old file is deleted, and one more signal.**
+  - The temporary file is created, and deleted again, before an existing output is deleted, so a path that cannot
+    be written does not cost the old file. The preallocation still comes after the deletion.
+  - Outside Windows, free space is asked of the nearest existing directory above the output: the root `/` says
+    nothing about the file system mounted at the output.
+  - An output path that is a directory or ends with a separator is rejected before anything is touched. An empty
+    output path is an invalid argument (exit code 2).
+  - SIGHUP, which on Windows is the console window being closed, cancels like Ctrl+C and SIGTERM.
+  - The token is checked for every block and after the prompt, not for every chunk: a block is at most 1 MiB, which
+    keeps the reaction time to milliseconds.
+  - A failed write of the settings, of the progress line or of the summary is reported as a failure of the console,
+    not of the output file. Before the file is complete it stops the run with exit code 1; after the file is in
+    place it costs only the summary, and the exit code stays 0. Removing the progress line never fails, and a
+    cancelled run ends with 130 even when the error stream is broken. A pipe whose reader has gone is not a failure
+    at all: the .NET runtime drops writes to it without an error.
+  - The manual check of Ctrl+C (Risks, task 7.5) sent a real console Ctrl+C event to the published executable from
+    a script instead of a key press: exit code 130 after 0.6 s, and no file left.
+- **D13: the command line.**
+  - The option name is added to every parse error in one place (`GeneratorApp.Describe`), not in each value
+    parser.
+  - A requirement was added after a review of the implementation, "Settings before the run" (task 7.8): every
+    setting in effect, the defaults and a chosen seed included, goes to standard error before generation, because a
+    run that fails or is cancelled prints no summary.
+  - `FileSort.Benchmarks` parses its command line with `System.CommandLine` too and reads sizes with the
+    generator's `SizeParser`, so options are declared, checked and documented one way in every program.
+  - The reproducing command line puts a path that contains a space in double quotes. Other characters that a shell
+    treats specially are left as they are: no single form of quoting works in both cmd and PowerShell.
+- **D10 and D15 were edited in place** during the implementation, before this section existed: the hashing and the
+  discarding sinks are test doubles and live with their users, in the tests and the benchmarks, and the program
+  holds only the file sink. The Context line describes the reference machine in general terms, as the public
+  documents do.
+- **D14, M5: memory.**
+  - Chunk buffers: 2 × 16 MiB, or 2 × 1 MiB with `--buffered-io`, not 1 or 2 × 8 MiB.
+  - The estimate for the pool was wrong. For `--words 1024` it is about 6 MiB, at most 13 MiB without edge cases
+    and 22 MiB with `unicode` and `separator`, not 17 MiB.
+  - The dictionary takes about 24 KB with its table of slots, not 10 KB.
+  - The measured peak working set in the default unbuffered mode is 81 to 92 MiB with 16 threads from 1 GB to
+    100 GB, and 132 MiB with 64 threads, against the expected 100 and 150 MB; the buffered mode takes 56 to 62 MiB.
+    End to end; Memory.
+- **D15: layout.** Folders group files by responsibility: `Cli/Options`, `Cli/Reports` (settings, progress and
+  summary), `Cli/Terminal` (the console and the prompt), `Content/Blocks`, `Content/Lines`, `Content/Words`,
+  `Output`, `Pipeline`, `Random`; one top-level type per file. The window of blocks in flight is a type of its
+  own, `Pipeline/BlockWindow`. The tests mirror these folders. `FileSort.Benchmarks` has three experiments,
+  `write-path`, `file-sink` and `pipeline`, besides the BenchmarkDotNet benchmarks.
+- **D16: how the measurements ran.**
+  - M2 ran through the `pipeline` experiment; a second round hit the full cache of the SSD and was discarded.
+    Block size.
+  - M3 added 32 MiB chunks, a series of three runs per chunk size and the two layouts of writers above; at 100 GB
+    one writer was measured. The write path.
+  - M4 ran through the `file-sink` experiment, with the one-buffer sink as an extra variant, in two runs. The file
+    sink.
+  - M6: generation alone is a BenchmarkDotNet benchmark of the pipeline into a discarding sink over 256 MiB
+    (`micro --filter *Pipeline*`), not a 10 GB stopwatch run; end to end is one run per thread count at 10 GB.
+    Where the limit is.
+  - The experiments take `--runs` and print the median, the slowest and the fastest run. The disk tables were
+    recorded before that and were not taken again, to spare the disk; each table says how many runs stand behind
+    it.
+- **The goal "throughput limited by the disk"** holds for large files, not for small ones. At 100 GB the generator
+  writes 1680 MiB/s where the raw disk takes 1835 MiB/s; at 10 GB it writes 1701 MiB/s where the raw disk took
+  about 2600 MiB/s at 8 GiB. End to end; The write path; Where the limit is.
+- **Added to the change:** GitHub Actions (`ci.yml`: build, tests and coverage with a threshold of 80% of the lines;
+  `publish.yml`: the generator's executable on demand), the test-only package
+  `Microsoft.Testing.Extensions.CodeCoverage`, and the rule in `CLAUDE.md` that tests cover at least 80% of the
+  lines of production code. Root `README.md`, Code coverage and Continuous integration.

@@ -12,7 +12,8 @@ before any reader is written.
 
 - Define the `Number. String` line format as a spec: what a valid line is, including the cases the README still lists
   as *TBD* (Number range, leading zeros, empty String).
-- Add the shared line format code to `FileSort.Common`: format constants and writing a line as UTF-8 bytes.
+- Add the shared line format code to `FileSort.Common`: the format constants and the line ending. Writing a line
+  stays in the generator, the only program that composes lines.
 - Implement the generator in `FileSort.Generator`:
   - output of a requested size (`--size 1GB`, binary units) that ends on a line boundary;
   - deterministic content: the same seed and content options give a byte-identical file on any OS, with any thread
@@ -30,7 +31,8 @@ before any reader is written.
   write-path experiment that measures what the disk can take.
 - Add the first tests: line format, PRNG reference vectors, determinism, size, validity of every line, repeats.
 - Update `README.md` (Repository layout, Assumptions, Generator, Quick start, Performance, Design decisions,
-  Limitations) and the command list in `CLAUDE.md`.
+  Limitations), add `FileSort.Generator/README.md` with the generator's options, measurements, design decisions and
+  limitations, and update the command list in `CLAUDE.md`.
 
 ## Capabilities
 
@@ -89,6 +91,6 @@ The task statement leaves these open. Each one is a decision of this change and 
 - **Dependencies**: `System.CommandLine` 2.0.15 in the generator. It is a Microsoft package, but it is the first
   NuGet dependency of production code, so a check publish with trimming verifies that the whole application, the
   package included, has no trim warnings. `BenchmarkDotNet` 0.15.8 in the benchmarks project only.
-- **Documentation**: `README.md` and `CLAUDE.md`.
+- **Documentation**: `README.md`, `FileSort.Generator/README.md` and `CLAUDE.md`.
 - **Later changes**: the checker and the sorter rely on `line-format`; the sorter change adds the parser and the
   requirements for reading.

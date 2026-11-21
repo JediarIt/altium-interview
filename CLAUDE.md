@@ -20,12 +20,34 @@ intuition.
 ```powershell
 dotnet build FileSort.slnx -c Release
 dotnet test --solution FileSort.slnx -c Release
+
+# Tests with code coverage: the report goes to TestResults/coverage.cobertura.xml (ignored by git)
+dotnet test --solution FileSort.slnx -c Release --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
+# The coverage table that CI prints, and its 80% check; without GitHub it prints to the console
+./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml
+
 dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
 dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
+
+# Generator: a test file in the ignored data/ directory (all options: --help, or FileSort.Generator/README.md)
+dotnet run -c Release --project FileSort.Generator -- --output data/test-1gb.txt --size 1GB --seed 1
+
+# Check publish: the trimmer analyses the whole generator, System.CommandLine included; it must report no warnings
+dotnet publish FileSort.Generator -c Release -r win-x64 -p:PublishTrimmed=true -o publish/trim-check
+
+# Benchmarks and experiments (usage: run without arguments)
+dotnet run -c Release --project FileSort.Benchmarks -- micro --filter *
+dotnet run -c Release --project FileSort.Benchmarks -- write-path --file data/write-path.bin --writers 1 --pause 30
+dotnet run -c Release --project FileSort.Benchmarks -- file-sink --file data/file-sink.bin
+dotnet run -c Release --project FileSort.Benchmarks -- pipeline --sink discard
 ```
 
-`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`) and exits with code 8 ("zero tests ran")
-until the first tests exist. Commands for running the generator, sorter and checker will be added with their CLIs.
+`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`). Commands for running the sorter and the
+checker will be added with their CLIs.
+
+A change that alters the bytes the generator writes for an existing seed raises `ContentFormat.Version` and records
+new reference hashes in `ReferenceFileTests`; a hash recorded for an existing version is never edited.
 
 ## Architecture rules
 
@@ -51,6 +73,10 @@ until the first tests exist. Commands for running the generator, sorter and chec
 - Overlap I/O with CPU work and use all cores for parsing and sorting.
 - Measure, don't guess: BenchmarkDotNet for hot primitives (parse, compare), plus an end-to-end harness that
   reports wall time and peak memory.
+- Disk measurements: files of 1 to 2 GB by default, the 100 GB case once at the end. Leave pauses between runs (an
+  SSD's fast cache fills, and the next run measures the cache), repeat a case with `--runs` and report the median
+  and the spread; say how many runs stand behind a number. Processor-only measurements go through BenchmarkDotNet.
+- Build the solution before a `--no-build` run of `FileSort.Benchmarks`: `dotnet test` does not rebuild it.
 
 ## Code
 
@@ -61,6 +87,22 @@ until the first tests exist. Commands for running the generator, sorter and chec
 - Package versions live in `Directory.Packages.props`; `PackageReference` items carry no `Version`.
 - Small, single-responsibility types with clear boundaries: line format and parsing, comparison, run creation,
   merging, CLI. No god classes and no speculative abstractions.
+- One top-level type per file, and the file is named after the type. No exceptions, in tests and benchmarks too: a
+  two-line record or an enum that only one class uses still gets its own file. Types nested inside a class stay in
+  it.
+- Folders group files by what they do (`Cli`, `Content`, `Output`, `Pipeline`), not by what kind of type they hold:
+  no `Enums`, `Extensions` or `Constants` folders. A folder is a short list, not a sheet: when it grows past about
+  seven files, split it into subfolders by responsibility (`Cli/Options`, `Cli/Terminal`, `Content/Words`,
+  `Content/Lines`, `Content/Blocks`). The namespace of a file is its folder, and the tests mirror the folders of the
+  code they test.
+- Before writing a constant, a helper or a loop, check whether the framework already has it (`Encoding.UTF8.Preamble`,
+  `Utf8Formatter`, `Directory.CreateTempSubdirectory`). Hand-written code replaces a framework call only when a
+  benchmark shows the gain, and a comment next to it says so.
+- Use a primary constructor where a constructor only stores its parameters; keep private fields, initialized from
+  the parameters, so the `_field` naming stays. A constructor that validates or computes stays an ordinary one.
+- Keep methods flat, about two levels of nesting. State that several steps of a method share becomes a small type
+  with named methods, not a local function that captures the method's locals; a `try`, a loop or a branch that
+  would nest deeper becomes a method with a name.
 - Keep third-party dependencies in production code to a minimum.
 - A clear CLI: `--help`, meaningful error messages, non-zero exit codes; Ctrl+C cancels and cleans up temp files.
 - The generator is deterministic for a given seed (reproducible test files) and fast enough to produce 100 GB in
@@ -73,6 +115,11 @@ until the first tests exist. Commands for running the generator, sorter and chec
   compare against a naive in-memory sort.
 - The Checker confirms that an output is sorted AND is a permutation of its input (line count plus an
   order-independent hash).
+- Tests write as little to the disk as they can: megabytes, not hundreds of megabytes. What can be checked in
+  memory (content, determinism, thread counts) is checked in memory; files are for what only a file can show.
+- Tests cover at least 80% of the lines of production code (every project except the tests and the benchmarks).
+  Measure the coverage before calling a change done. Below 80%, for the whole or for one class, either add tests
+  or say in the README why that code is not covered by tests and what checks it instead.
 
 ## Workflow
 
@@ -86,8 +133,19 @@ Each significant piece of work (generator, sorter, checker, report) goes through
 
 Small fixes don't need a change. The README's assumptions move into `openspec/specs/` as changes get archived.
 
+Continuous integration is in `.github/workflows/`: `ci.yml` builds, tests and checks the coverage when code
+changes (not for documentation or `openspec/` alone); `publish.yml` builds the generator's executable by hand.
+What CI runs is what the Commands above run: change a command there and here together. A new program gets its
+paths in `ci.yml` and, when it ships as an executable, a job in `publish.yml`. Test results leave the run as JUnit
+XML and as a Markdown summary; coverage as Cobertura.
+
 Rules for every change:
 
-- Update README.md in the same change as every decision, feature or measured result; it must never be stale.
+- Update the READMEs in the same change as every decision, feature or measured result; they must never be stale.
+  The root `README.md` is the overview and stays short; the details of a program (options, behavior, measurements,
+  its design decisions and limitations) live in the `README.md` of its project folder, and the root links to it.
+  A table is written in one of them, not in both; the root quotes headline figures only.
+- Documentation describes the reference machine in general terms (cores, memory, kind of disk): no model names,
+  no paths of the development machine. Example paths are neutral, like `C:\data\test.txt` or `data/test.txt`.
 - Write code, comments, commit messages and docs in English.
 - Never commit large data files: use the ignored `data/` directory or a path outside the project.

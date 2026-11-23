@@ -1,3 +1,5 @@
+using FileSort.Cli.Terminal;
+
 namespace FileSort.Generator.Cli.Terminal;
 
 /// <summary>Asks before an existing output file is replaced. Only <c>y</c> or <c>yes</c> is consent.</summary>

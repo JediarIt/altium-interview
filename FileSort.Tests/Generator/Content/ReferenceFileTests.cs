@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 
+using FileSort.Cli;
 using FileSort.Common;
 using FileSort.Generator.Cli;
 using FileSort.Generator.Content;
 using FileSort.Generator.Content.Blocks;
 using FileSort.Generator.Pipeline;
+using FileSort.Tests.Cli;
 
 namespace FileSort.Tests.Generator.Content;
 

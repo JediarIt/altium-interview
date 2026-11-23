@@ -1,0 +1,73 @@
+name: Generator
+
+# Builds the solution and runs the tests of the generator with code coverage. It starts when something changes that
+# can affect the generator: its code, the code it shares with the other programs, the tests, the build files. A
+# commit that touches only the checker, documentation or the OpenSpec artifacts does not start it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FileSort.Generator/**'
+      - 'FileSort.Common/**'
+      - 'FileSort.Cli/**'
+      - 'FileSort.Benchmarks/**'
+      - 'FileSort.Tests/**'
+      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
+      - 'FileSort.Sorter/**'
+      - 'FileSort.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - '.editorconfig'
+      - '.github/workflows/test-program.yml'
+      - '.github/workflows/generator.yml'
+      - '.github/scripts/**'
+      # The tests of the checker are the checker's business...
+      - '!FileSort.Tests/Checker/**'
+      # ...and documentation inside the project folders is not code...
+      - '!FileSort.*/**/*.md'
+      # ...except the README whose options table a test compares with the command line.
+      - 'FileSort.Generator/README.md'
+  pull_request:
+    paths:
+      - 'FileSort.Generator/**'
+      - 'FileSort.Common/**'
+      - 'FileSort.Cli/**'
+      - 'FileSort.Benchmarks/**'
+      - 'FileSort.Tests/**'
+      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
+      - 'FileSort.Sorter/**'
+      - 'FileSort.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - '.editorconfig'
+      - '.github/workflows/test-program.yml'
+      - '.github/workflows/generator.yml'
+      - '.github/scripts/**'
+      # The tests of the checker are the checker's business...
+      - '!FileSort.Tests/Checker/**'
+      # ...and documentation inside the project folders is not code...
+      - '!FileSort.*/**/*.md'
+      # ...except the README whose options table a test compares with the command line.
+      - 'FileSort.Generator/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer commit on the same branch makes the run of an older one pointless.
+concurrency:
+  group: generator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/test-program.yml
+    with:
+      program: generator
+      # The generator, the line format it shares, the naive parser that checks what it writes, the console library.
+      namespaces: FileSort.Tests.Generator* FileSort.Tests.Common* FileSort.Tests.Format* FileSort.Tests.Cli*
+      assemblies: FileSort.Generator,FileSort.Common,FileSort.Cli

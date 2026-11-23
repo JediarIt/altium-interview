@@ -447,11 +447,13 @@ the generator.
   authors' reference code as it is.
 - **`System.CommandLine` for the command line.** It is Microsoft's parser, the one behind the `dotnet` CLI: typed
   options, validation, `--help` and `--version`. Without it each of the three programs would carry 100 to 150 lines
-  of hand-written parsing and help text, and a shared hand-written parser has no home, because the Checker must not
-  reference `FileSort.Common`. Version 2.0.15 is the latest patch of the line released with .NET 10; 3.0.0 was a
-  few days old when this was decided. It is the only NuGet package in production code, and a check publish with
-  trimming confirms that it does not break the self-contained generator. The benchmark project uses the same parser
-  and the generator's own size parser, so options are declared, checked and documented in one way everywhere.
+  of hand-written parsing and help text. Version 2.0.15 is the latest patch of the line released with .NET 10;
+  3.0.0 was a few days old when this was decided. It is the only NuGet package of the generator, and a check
+  publish with trimming confirms that it does not break the self-contained executable. What the programs do the
+  same way around the parser (errors that name their option, the exit codes, the console, Ctrl+C) lives in the
+  shared library `FileSort.Cli`, see the [root README](../README.md#design-decisions). The benchmark project uses
+  the same parser and the generator's own size parser, so options are declared, checked and documented in one way
+  everywhere.
 - **No console UI framework.** Libraries such as Spectre.Console or RazorConsole draw tables, progress bars and
   whole screens. The generator prints eleven lines of settings, one progress line and eleven lines of summary, and
   that does not pay for a second dependency in a tool that has to pass the trim check and to start fast as a single

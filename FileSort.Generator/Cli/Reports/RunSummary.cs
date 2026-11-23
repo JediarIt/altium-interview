@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
+using FileSort.Cli.Reports;
 using FileSort.Common;
 using FileSort.Generator.Cli.Options;
 using FileSort.Generator.Content;

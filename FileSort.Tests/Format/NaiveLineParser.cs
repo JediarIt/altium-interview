@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Numerics;
 using System.Text;
 
@@ -42,7 +43,7 @@ internal static class NaiveLineParser
     public static NaiveLine? ParseLine(byte[] line)
     {
         int separator = line.AsSpan().IndexOf(". "u8);
-        if (separator < 1 || separator > 20)
+        if (separator < 1)
         {
             return null;
         }
@@ -53,11 +54,8 @@ internal static class NaiveLineParser
             return null;
         }
 
-        BigInteger number = BigInteger.Parse(numberText);
-        if (number > ulong.MaxValue)
-        {
-            return null;
-        }
+        // A Number has no limit on its digits or its value, so the value is a BigInteger.
+        BigInteger number = BigInteger.Parse(numberText, CultureInfo.InvariantCulture);
 
         byte[] text = line[(separator + 2)..];
         if (text.Contains((byte)'\n'))
@@ -74,7 +72,7 @@ internal static class NaiveLineParser
             return null;
         }
 
-        return new NaiveLine((ulong)number, numberText, text);
+        return new NaiveLine(number, numberText, text);
     }
 
     /// <summary>Parses a whole file; an invalid line is a null entry.</summary>

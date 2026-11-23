@@ -2,11 +2,13 @@ using System.CommandLine.Parsing;
 using System.Globalization;
 using System.Security.Cryptography;
 
+using FileSort.Cli;
 using FileSort.Common;
 using FileSort.Generator.Cli;
 using FileSort.Generator.Cli.Options;
 using FileSort.Generator.Content;
 using FileSort.Generator.Output;
+using FileSort.Tests.Cli;
 
 namespace FileSort.Tests.Generator.Cli;
 

@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
     <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
     <ProjectReference Include="..\FileSort.Generator\FileSort.Generator.csproj" />
     <ProjectReference Include="..\FileSort.Sorter\FileSort.Sorter.csproj" />
@@ -31,8 +32,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- A test compares the options table of the generator's README with the generator's command line. -->
+    <!-- Tests compare the options table of a program's README with the program's command line. -->
     <None Include="..\FileSort.Generator\README.md" Link="FileSort.Generator.README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\FileSort.Checker\README.md" Link="FileSort.Checker.README.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

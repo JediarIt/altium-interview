@@ -8,12 +8,17 @@ namespace FileSort.Common;
 /// </summary>
 public static class LineFormat
 {
-    /// <summary>The largest value of a Number. The two limits of a Number are defined here and nowhere else.</summary>
+    /// <summary>
+    /// The largest Number that fits in 64 bits. It is not a limit of the format: a Number is valid with any count of
+    /// digits and any value. It is the end of the 64-bit range: the largest Number that the generator writes, and
+    /// the largest that a comparison of Numbers as 64-bit integers can handle. The range is defined here and
+    /// nowhere else.
+    /// </summary>
     public const ulong MaxNumber = ulong.MaxValue;
 
     /// <summary>
-    /// The longest Number, in digits: the length of <see cref="MaxNumber"/>. Leading zeros count, so a Number with
-    /// zeros in front still has at most this many digits.
+    /// The count of digits of <see cref="MaxNumber"/>. The generator writes no Number with more digits, leading
+    /// zeros included. A longer Number is still valid, and its value may or may not fit in 64 bits.
     /// </summary>
     public const int MaxNumberDigits = 20;
 

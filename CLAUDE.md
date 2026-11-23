@@ -27,24 +27,38 @@ dotnet test --solution FileSort.slnx -c Release --coverage --coverage-output-for
 # The coverage table that CI prints, and its 80% check; without GitHub it prints to the console
 ./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml
 
+# One program, as its CI workflow does it: the tests of its namespaces, the coverage of its assemblies
+dotnet test --solution FileSort.slnx -c Release --filter-namespace FileSort.Tests.Generator* FileSort.Tests.Common* FileSort.Tests.Format* FileSort.Tests.Cli* --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Assemblies FileSort.Generator,FileSort.Common,FileSort.Cli
+dotnet test --solution FileSort.slnx -c Release --filter-namespace FileSort.Tests.Checker* FileSort.Tests.Format* FileSort.Tests.Cli* --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Assemblies FileSort.Checker,FileSort.Cli
+
 dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
 dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
 
 # Generator: a test file in the ignored data/ directory (all options: --help, or FileSort.Generator/README.md)
 dotnet run -c Release --project FileSort.Generator -- --output data/test-1gb.txt --size 1GB --seed 1
 
-# Check publish: the trimmer analyses the whole generator, System.CommandLine included; it must report no warnings
+# Checker: is the second file the sorted version of the first? (all options: --help, or FileSort.Checker/README.md)
+dotnet run -c Release --project FileSort.Checker -- --input data/test-1gb.txt --sorted data/sorted-1gb.txt
+
+# Check publish: the trimmer analyses a whole program, its packages included; it must report no warnings
 dotnet publish FileSort.Generator -c Release -r win-x64 -p:PublishTrimmed=true -o publish/trim-check
+dotnet publish FileSort.Checker -c Release -r win-x64 -p:PublishTrimmed=true -o publish/trim-check
 
 # Benchmarks and experiments (usage: run without arguments)
 dotnet run -c Release --project FileSort.Benchmarks -- micro --filter *
 dotnet run -c Release --project FileSort.Benchmarks -- write-path --file data/write-path.bin --writers 1 --pause 30
 dotnet run -c Release --project FileSort.Benchmarks -- file-sink --file data/file-sink.bin
 dotnet run -c Release --project FileSort.Benchmarks -- pipeline --sink discard
+
+# A sorted copy of a file of up to 2 GB, made in memory, and the check of the pair by chunk size and threads
+dotnet run -c Release --project FileSort.Benchmarks -- sorted-copy --input data/test-1gb.txt --output data/sorted-1gb.txt
+dotnet run -c Release --project FileSort.Benchmarks -- check --input data/test-1gb.txt --sorted data/sorted-1gb.txt
 ```
 
-`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`). Commands for running the sorter and the
-checker will be added with their CLIs.
+`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`). Commands for running the sorter will be
+added with its CLI.
 
 A change that alters the bytes the generator writes for an existing seed raises `ContentFormat.Version` and records
 new reference hashes in `ReferenceFileTests`; a hash recorded for an existing version is never edited.
@@ -52,6 +66,10 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 ## Architecture rules
 
 - `FileSort.Common` holds the line format shared by the Generator and the Sorter.
+- `FileSort.Cli` holds the console plumbing shared by the console programs: exit codes, the console abstraction,
+  the progress line, Ctrl+C, command-line errors. It references `System.CommandLine` and nothing else. Console
+  code never goes into `FileSort.Common`: the checker and the sorting engine must not get it through that
+  reference.
 - The sorting engine lives in a class library with no console dependencies; `FileSort.Sorter` is only a thin CLI
   host over it (arguments, console output, exit codes). The library is introduced together with the sorter
   implementation.
@@ -133,11 +151,14 @@ Each significant piece of work (generator, sorter, checker, report) goes through
 
 Small fixes don't need a change. The README's assumptions move into `openspec/specs/` as changes get archived.
 
-Continuous integration is in `.github/workflows/`: `ci.yml` builds, tests and checks the coverage when code
-changes (not for documentation or `openspec/` alone); `publish.yml` builds the generator's executable by hand.
-What CI runs is what the Commands above run: change a command there and here together. A new program gets its
-paths in `ci.yml` and, when it ships as an executable, a job in `publish.yml`. Test results leave the run as JUnit
-XML and as a Markdown summary; coverage as Cobertura.
+Continuous integration is in `.github/workflows/`. Every program has a workflow of its own (`generator.yml`,
+`checker.yml`), started by the changes that can affect it (not by documentation or `openspec/` alone); each calls
+`test-program.yml`, which builds the solution, runs the tests of the program's namespaces and checks the coverage
+of its assemblies. `publish.yml` builds the executable of the generator or of the checker by hand. What CI runs is
+what the Commands above run: change a command there and here together. A new program gets a workflow of its own
+that calls `test-program.yml` and, when it ships as an executable, an option in `publish.yml`. A new test
+namespace is added to the workflow of its program: tests in a namespace that no workflow names do not run in CI.
+Test results leave the run as JUnit XML and as a Markdown summary; coverage as Cobertura.
 
 Rules for every change:
 

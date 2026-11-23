@@ -1,9 +1,10 @@
-using System.CommandLine;
-using System.CommandLine.Parsing;
 using System.Diagnostics;
 using System.Globalization;
 using System.Security;
 
+using FileSort.Cli;
+using FileSort.Cli.Reports;
+using FileSort.Cli.Terminal;
 using FileSort.Generator.Cli.Options;
 using FileSort.Generator.Cli.Reports;
 using FileSort.Generator.Cli.Terminal;
@@ -25,25 +26,7 @@ internal static class GeneratorApp
         GeneratorCommand command = new();
         command.Root.SetAction(result => Generate(command.Bind(result), console, cancellationToken));
 
-        ParseResult parsed = command.Root.Parse(args);
-        if (parsed.Errors.Count > 0)
-        {
-            foreach (string message in parsed.Errors.Select(Describe).Distinct())
-            {
-                console.Error.WriteLine(message);
-            }
-
-            console.Error.WriteLine("Run with --help to see the options.");
-            return ExitCode.InvalidArguments;
-        }
-
-        // Runs the generation, or prints the help or the version when that was asked for.
-        return parsed.Invoke(new InvocationConfiguration
-        {
-            Output = console.Out,
-            Error = console.Error,
-            EnableDefaultExceptionHandler = false,
-        });
+        return CommandRunner.Run(command.Root, args, console);
     }
 
     private static int Generate(GeneratorSettings settings, IAppConsole console, CancellationToken cancellationToken)
@@ -54,7 +37,7 @@ internal static class GeneratorApp
         }
         catch (OperationCanceledException)
         {
-            TryWriteError(console, "Cancelled. No file was written.");
+            console.TryWriteError("Cancelled. No file was written.");
             return ExitCode.Cancelled;
         }
         catch (ConsoleWriteException e)
@@ -108,7 +91,7 @@ internal static class GeneratorApp
         }
         catch (IOException e)
         {
-            TryWriteError(console, $"The file was written, but the summary could not be printed: {e.Message}");
+            console.TryWriteError($"The file was written, but the summary could not be printed: {e.Message}");
         }
 
         return ExitCode.Success;
@@ -187,36 +170,9 @@ internal static class GeneratorApp
         }
     }
 
-    // Every error about the command line names its option. The library's messages about a value do not always do
-    // that ("Argument 'cr' not recognized"), so the name is added here, in one place, for every option.
-    private static string Describe(ParseError error)
-    {
-        SymbolResult? result = error.SymbolResult;
-        while (result is not null and not OptionResult)
-        {
-            result = result.Parent;
-        }
-
-        return result is OptionResult option && !error.Message.Contains(option.Option.Name, StringComparison.Ordinal)
-            ? $"Option '{option.Option.Name}': {error.Message}"
-            : error.Message;
-    }
-
     private static int Fail(IAppConsole console, string message)
     {
-        TryWriteError(console, message);
+        console.TryWriteError(message);
         return ExitCode.Failure;
-    }
-
-    private static void TryWriteError(IAppConsole console, string message)
-    {
-        try
-        {
-            console.Error.WriteLine(message);
-        }
-        catch (IOException)
-        {
-            // The error stream itself is broken: there is nowhere to report to, and the exit code still tells.
-        }
     }
 }

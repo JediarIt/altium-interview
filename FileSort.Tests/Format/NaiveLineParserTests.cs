@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Numerics;
 using System.Text;
 
 namespace FileSort.Tests.Format;
@@ -20,7 +22,7 @@ public class NaiveLineParserTests
         NaiveLine? line = Parse("415. Apple");
 
         Assert.NotNull(line);
-        Assert.Equal(415UL, line.Number);
+        Assert.Equal(415, line.Number);
         Assert.Equal("Apple", line.TextAsString);
     }
 
@@ -30,7 +32,7 @@ public class NaiveLineParserTests
         NaiveLine? line = Parse("12. 3. Apple");
 
         Assert.NotNull(line);
-        Assert.Equal(12UL, line.Number);
+        Assert.Equal(12, line.Number);
         Assert.Equal("3. Apple", line.TextAsString);
     }
 
@@ -57,33 +59,41 @@ public class NaiveLineParserTests
     [Fact]
     public void Zero()
     {
-        Assert.Equal(0UL, Parse("0. Apple")?.Number);
+        Assert.Equal(BigInteger.Zero, Parse("0. Apple")?.Number);
     }
 
     [Fact]
     public void Largest_Number()
     {
-        Assert.Equal(ulong.MaxValue, Parse("18446744073709551615. Apple")?.Number);
+        Assert.Equal((BigInteger)ulong.MaxValue, Parse("18446744073709551615. Apple")?.Number);
     }
 
     [Fact]
     public void Number_above_the_range()
     {
-        Assert.Null(Parse("18446744073709551616. Apple"));
+        NaiveLine? above = Parse("18446744073709551616. Apple");
+
+        Assert.NotNull(above);
+        Assert.Equal(Parse("18446744073709551615. Apple")!.Number + 1, above.Number);
     }
 
     [Fact]
     public void Leading_zeros()
     {
-        Assert.Equal(7UL, Parse("007. Apple")?.Number);
+        Assert.Equal((BigInteger)7, Parse("007. Apple")?.Number);
         Assert.Equal(Parse("7. Apple")?.Number, Parse("007. Apple")?.Number);
     }
 
     [Fact]
     public void More_than_20_digits()
     {
-        Assert.NotNull(Parse("00000000000000000007. Apple"));
-        Assert.Null(Parse("000000000000000000007. Apple"));
+        NaiveLine? zeros = Parse("000000000000000000007. Apple");
+        NaiveLine? long40 = Parse("1234567890123456789012345678901234567890. Apple");
+
+        Assert.Equal(21, zeros?.NumberText.Length);
+        Assert.Equal((BigInteger)7, zeros?.Number);
+        Assert.Equal(40, long40?.NumberText.Length);
+        Assert.Equal(BigInteger.Parse("1234567890123456789012345678901234567890", CultureInfo.InvariantCulture), long40?.Number);
     }
 
     [Theory]
@@ -218,7 +228,7 @@ public class NaiveLineParserTests
 
         NaiveLine line = Assert.Single(NaiveLineParser.ParseValidFile(file, "\n"));
 
-        Assert.Equal(1UL, line.Number);
+        Assert.Equal(1, line.Number);
         Assert.Equal("Apple", line.TextAsString);
     }
 

@@ -1,0 +1,85 @@
+name: Test a program
+
+# The steps that the workflow of every program runs, kept in one place: build the solution, run the tests of the
+# program with code coverage, publish the summaries and fail when the assemblies of the program, taken together,
+# are under 80% of their lines. It is called by generator.yml and checker.yml and never starts by itself.
+on:
+  workflow_call:
+    inputs:
+      program:
+        description: The name of the program, for the titles and the name of the uploaded results
+        type: string
+        required: true
+      namespaces:
+        description: The namespaces of the tests to run, separated by spaces; a name may end with *
+        type: string
+        required: true
+      assemblies:
+        description: The assemblies whose coverage is counted, separated by commas
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test ${{ inputs.program }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore FileSort.slnx
+
+      # The whole solution, whichever program is tested: the test project references every program, and warnings
+      # are errors in all of them. The SDK setup registers a problem matcher, so a compiler message shows up as an
+      # annotation on the changed line.
+      - name: Build
+        run: dotnet build FileSort.slnx -c Release --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test --solution FileSort.slnx -c Release --no-build
+          --filter-namespace ${{ inputs.namespaces }}
+          --results-directory TestResults
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+          --report-xunit-markdown --report-xunit-markdown-filename tests.md
+          --report-xunit-junit --report-xunit-junit-filename tests.junit.xml
+
+      # The summaries go to the page of the run. They are written after a failed test run too.
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          if (Test-Path TestResults/tests.md) {
+            Get-Content TestResults/tests.md | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          } else {
+            '### Test Results' , '', 'The tests did not produce a report.' | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+
+      # Fails the run when the line coverage of the assemblies of this program, taken together, is below 80%.
+      - name: Coverage summary
+        if: ${{ !cancelled() && hashFiles('TestResults/coverage.cobertura.xml') != '' }}
+        shell: pwsh
+        run: >-
+          ./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Threshold 80
+          -Assemblies ${{ inputs.assemblies }}
+
+      - name: Upload the test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ inputs.program }}
+          path: TestResults/
+          if-no-files-found: ignore

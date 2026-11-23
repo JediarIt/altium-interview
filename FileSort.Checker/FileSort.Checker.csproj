@@ -2,6 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!-- Keeps the trimming, single-file and AOT analyzers on, so the code stays safe for every publish mode. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <!--
+      Every method is compiled with full optimization the first time it runs. A check is one hot loop that lasts
+      seconds: with tiered compilation its first second ran in unoptimized code, and a pair of 1 GB files took
+      2.6 to 3.9 s instead of 1.9 to 2.2 s in one series (see the README of the checker).
+    -->
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 
   <!--
@@ -13,5 +21,23 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+
+  <!--
+    No reference to FileSort.Common, on purpose: the checker is an oracle with its own parsing and comparison, and a
+    test fails if its assembly ever references the shared line code.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileSort.Tests" />
+    <InternalsVisibleTo Include="FileSort.Benchmarks" />
+  </ItemGroup>
 
 </Project>

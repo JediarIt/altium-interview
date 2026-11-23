@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -100,12 +101,12 @@ public partial class EdgeCaseTests
     public void Category_big_numbers()
     {
         List<NaiveLine> lines = Lines(EdgeCases.BigNumbers);
-        HashSet<ulong> numbers = [.. lines.Select(line => line.Number)];
+        HashSet<BigInteger> numbers = [.. lines.Select(line => line.Number)];
 
-        Assert.Contains(4294967296UL, numbers);
-        Assert.Contains(9223372036854775807UL, numbers);
-        Assert.Contains(9223372036854775808UL, numbers);
-        Assert.Contains(18446744073709551615UL, numbers);
+        Assert.Contains((BigInteger)4294967296UL, numbers);
+        Assert.Contains((BigInteger)9223372036854775807UL, numbers);
+        Assert.Contains((BigInteger)9223372036854775808UL, numbers);
+        Assert.Contains((BigInteger)18446744073709551615UL, numbers);
 
         // Every length from 10 to 20 digits occurs, not only the boundary values.
         Assert.Equal(Enumerable.Range(1, 20), lines.Select(line => line.NumberText.Length).Distinct().Order());

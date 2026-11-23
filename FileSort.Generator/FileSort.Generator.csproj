@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
     <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
   </ItemGroup>
 

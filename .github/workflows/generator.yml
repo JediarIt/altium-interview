@@ -2,7 +2,7 @@ name: Generator
 
 # Builds the solution and runs the tests of the generator with code coverage. It starts when something changes that
 # can affect the generator: its code, the code it shares with the other programs, the tests, the build files. A
-# commit that touches only the checker, documentation or the OpenSpec artifacts does not start it.
+# commit that touches only the checker, the sorter, documentation or the OpenSpec artifacts does not start it.
 on:
   push:
     branches: [main]
@@ -12,8 +12,6 @@ on:
       - 'FileSort.Cli/**'
       - 'FileSort.Benchmarks/**'
       - 'FileSort.Tests/**'
-      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
-      - 'FileSort.Sorter/**'
       - 'FileSort.slnx'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
@@ -23,8 +21,10 @@ on:
       - '.github/workflows/test-program.yml'
       - '.github/workflows/generator.yml'
       - '.github/scripts/**'
-      # The tests of the checker are the checker's business...
+      # The tests of the checker, of the sorter and of its engine are theirs...
       - '!FileSort.Tests/Checker/**'
+      - '!FileSort.Tests/Sorter/**'
+      - '!FileSort.Tests/Engine/**'
       # ...and documentation inside the project folders is not code...
       - '!FileSort.*/**/*.md'
       # ...except the README whose options table a test compares with the command line.
@@ -36,8 +36,6 @@ on:
       - 'FileSort.Cli/**'
       - 'FileSort.Benchmarks/**'
       - 'FileSort.Tests/**'
-      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
-      - 'FileSort.Sorter/**'
       - 'FileSort.slnx'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
@@ -47,8 +45,10 @@ on:
       - '.github/workflows/test-program.yml'
       - '.github/workflows/generator.yml'
       - '.github/scripts/**'
-      # The tests of the checker are the checker's business...
+      # The tests of the checker, of the sorter and of its engine are theirs...
       - '!FileSort.Tests/Checker/**'
+      - '!FileSort.Tests/Sorter/**'
+      - '!FileSort.Tests/Engine/**'
       # ...and documentation inside the project folders is not code...
       - '!FileSort.*/**/*.md'
       # ...except the README whose options table a test compares with the command line.

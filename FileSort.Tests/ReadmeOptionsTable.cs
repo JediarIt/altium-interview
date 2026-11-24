@@ -45,7 +45,8 @@ internal sealed partial class ReadmeOptionsTable
         return new ReadmeOptionsTable(rows);
     }
 
-    /// <summary>The table has a row for every option of the command, under every name a user can type, and no other.</summary>
+    /// <summary>The table has a row for every option of the command, under every name a user can type, and no
+    /// other.</summary>
     public void AssertListsExactlyTheOptionsOf(RootCommand command)
     {
         IEnumerable<string> expected = command.Options.SelectMany(Names).Order(StringComparer.Ordinal);

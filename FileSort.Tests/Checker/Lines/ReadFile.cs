@@ -51,8 +51,9 @@ internal sealed record ReadFile(List<ReadLine> Lines, bool HasByteOrderMark, int
                 return true;
             }
 
-            lines.Add(new ReadLine(
-                read, line.ToArray(), linesBefore + splitter.LineNumber, chunk.Offset + splitter.LineOffset, splitter.LineHasTerminator));
+            long number = linesBefore + splitter.LineNumber;
+            long offset = chunk.Offset + splitter.LineOffset;
+            lines.Add(new ReadLine(read, line.ToArray(), number, offset, splitter.LineHasTerminator));
             if (read != LineRead.Line)
             {
                 return false;

@@ -22,7 +22,8 @@ public class ChunkReaderTests
         List<Piece> pieces = [];
         while (reader.Read() is Chunk chunk)
         {
-            pieces.Add(new Piece(Encoding.UTF8.GetString(chunk.Bytes), chunk.Offset, chunk.EndsFile, chunk.IsLineWithoutEnd));
+            string text = Encoding.UTF8.GetString(chunk.Bytes);
+            pieces.Add(new Piece(text, chunk.Offset, chunk.EndsFile, chunk.IsLineWithoutEnd));
             ChunkReader.Release(chunk);
         }
 
@@ -63,10 +64,12 @@ public class ChunkReaderTests
     [Theory]
     [InlineData("lf", "\n")]
     [InlineData("crlf", "\r\n")]
-    public void Every_chunk_but_the_last_ends_with_a_line_feed_and_the_chunks_are_the_file(string ending, string terminator)
+    public void Every_chunk_but_the_last_ends_with_a_line_feed_and_the_chunks_are_the_file(
+        string ending, string terminator)
     {
         LineEnding lineEnding = ending == "crlf" ? LineEnding.CrLf : LineEnding.Lf;
-        string content = string.Concat(Enumerable.Range(1, 200).Select(i => $"{i}. Line number {i}{terminator}")) + "9. last";
+        IEnumerable<string> lines = Enumerable.Range(1, 200).Select(i => $"{i}. Line number {i}{terminator}");
+        string content = string.Concat(lines) + "9. last";
         byte[] file = Utf8(content);
 
         for (int chunkSize = 1; chunkSize < 300; chunkSize += 7)
@@ -129,7 +132,9 @@ public class ChunkReaderTests
     public void Each_chunk_can_carry_the_last_line_of_the_chunk_before(string ending, string terminator)
     {
         LineEnding lineEnding = ending == "crlf" ? LineEnding.CrLf : LineEnding.Lf;
-        string content = string.Concat(Enumerable.Range(1, 60).Select(i => $"{i}. Line {new string('x', i % 7)}{terminator}"));
+        IEnumerable<string> fileLines = Enumerable.Range(1, 60)
+            .Select(i => $"{i}. Line {new string('x', i % 7)}{terminator}");
+        string content = string.Concat(fileLines);
         using MemoryStream stream = new(Utf8(content));
         ChunkReader reader = new(stream, lineEnding, chunkSize: 37, maxLineLength: 100, keepPreviousLine: true);
         string? lastLineBefore = null;

@@ -17,6 +17,7 @@ internal static class LineLimit
         string line = string.Create(
             CultureInfo.InvariantCulture,
             $"line {lineNumber}, which starts at byte {offset}, is longer than {limit} bytes");
-        return line + ", the longest line that the checker reads. A wrong line ending is a likely cause: see --line-ending.";
+        return line + ", the longest line that the checker reads. A wrong line ending is a likely cause: "
+            + "see --line-ending.";
     }
 }

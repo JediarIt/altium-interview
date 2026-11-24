@@ -17,6 +17,7 @@ internal static class EdgeCaseNames
         ("big-numbers", EdgeCases.BigNumbers),
         ("leading-zeros", EdgeCases.LeadingZeros),
         ("empty", EdgeCases.Empty),
+        ("carriage-return", EdgeCases.CarriageReturn),
     ];
 
     /// <summary>Every accepted name, for messages and the help text.</summary>
@@ -46,8 +47,14 @@ internal static class EdgeCaseNames
     /// <summary>The list that parses back into the same categories.</summary>
     public static string Format(EdgeCases categories)
     {
-        return categories == EdgeCases.All
-            ? All
-            : string.Join(',', Names.Where(entry => categories.HasFlag(entry.Category)).Select(entry => entry.Name));
+        if (categories == EdgeCases.All)
+        {
+            return All;
+        }
+
+        IEnumerable<string> names = Names
+            .Where(entry => categories.HasFlag(entry.Category))
+            .Select(entry => entry.Name);
+        return string.Join(',', names);
     }
 }

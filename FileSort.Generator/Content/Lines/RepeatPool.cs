@@ -21,6 +21,8 @@ internal sealed class RepeatPool
 
         for (int entry = 0; entry < ContentFormat.PoolSize; entry++)
         {
+            // The composer uses only the categories that change the words. A carriage return is not part of a pool
+            // String: the line that takes the String decides it, see LineComposer.
             EdgeCases applied = options.EdgeCases == EdgeCases.None
                 ? EdgeCases.None
                 : EdgeRoll.Apply(random.Next(), options.EdgeCases);

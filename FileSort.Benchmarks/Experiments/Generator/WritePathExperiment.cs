@@ -19,8 +19,10 @@ internal static class WritePathExperiment
         Option<string> file = ExperimentOptions.File();
         Option<long> size = ExperimentOptions.Size();
         Option<string[]> modes = ExperimentOptions.Modes();
-        Option<int[]> chunks = ExperimentOptions.Numbers("--chunks", "Chunk sizes in MiB, separated by commas.", 1, 4, 8, 16);
-        Option<int[]> writers = ExperimentOptions.Numbers("--writers", "Numbers of writers, separated by commas.", 1, 4, 8);
+        Option<int[]> chunks = ExperimentOptions.Numbers(
+            "--chunks", "Chunk sizes in MiB, separated by commas.", 1, 4, 8, 16);
+        Option<int[]> writers = ExperimentOptions.Numbers(
+            "--writers", "Numbers of writers, separated by commas.", 1, 4, 8);
         Option<bool> oneFile = new("--one-file")
         {
             Description = "The writers share one file and each writes a region of it, instead of a file each. On "
@@ -54,12 +56,22 @@ internal static class WritePathExperiment
     }
 
     private static void Run(
-        string file, long size, string[] modes, int[] chunks, int[] writers, bool preallocate, int runs, TimeSpan pause, bool oneFile)
+        string file,
+        long size,
+        string[] modes,
+        int[] chunks,
+        int[] writers,
+        bool preallocate,
+        int runs,
+        TimeSpan pause,
+        bool oneFile)
     {
         long totalBytes = size * modes.Length * chunks.Length * writers.Length * runs;
+        string preallocation = preallocate ? "yes" : "no";
+        string sharing = oneFile ? "writers share one file" : "one file per writer";
         Console.WriteLine(
-            $"File: {file}, size: {Measure.Size(size)}, preallocation: {(preallocate ? "yes" : "no")}, "
-            + $"{(oneFile ? "writers share one file" : "one file per writer")}. This series writes {Measure.Size(totalBytes)} in total.");
+            $"File: {file}, size: {Measure.Size(size)}, preallocation: {preallocation}, {sharing}. "
+            + $"This series writes {Measure.Size(totalBytes)} in total.");
         Measure.Header("Write mode", "Writers", "Chunk, MiB", "Median, MiB/s", "Min", "Max", "Runs");
 
         foreach (string mode in modes)
@@ -78,14 +90,16 @@ internal static class WritePathExperiment
                     List<double> throughputs = [];
                     for (int run = 0; run < runs; run++)
                     {
-                        throughputs.Add(Write(file, size, unbuffered, checked(chunk * (int)Measure.Mebibyte), writerCount, preallocate, oneFile));
+                        int chunkSize = checked(chunk * (int)Measure.Mebibyte);
+                        throughputs.Add(Write(file, size, unbuffered, chunkSize, writerCount, preallocate, oneFile));
 
                         // An SSD writes into a fast cache first and needs idle time to empty it.
                         Thread.Sleep(pause);
                     }
 
                     RunStatistics result = RunStatistics.From(throughputs);
-                    Measure.Row(unbuffered ? "Unbuffered" : "Buffered", writerCount, chunk, result.Median, result.Min, result.Max, result.Runs);
+                    string writeMode = unbuffered ? "Unbuffered" : "Buffered";
+                    Measure.Row(writeMode, writerCount, chunk, result.Median, result.Min, result.Max, result.Runs);
                 }
             }
         }
@@ -105,15 +119,15 @@ internal static class WritePathExperiment
         if (chunksPerWriter == 0)
         {
             throw new ArgumentException(
-                $"The size is too small: {writers} writers with chunks of {chunkSize / Measure.Mebibyte} MiB need at least "
-                + $"{Measure.Size((long)writers * chunkSize)}.");
+                $"The size is too small: {writers} writers with chunks of {chunkSize / Measure.Mebibyte} MiB need at "
+                + $"least {Measure.Size((long)writers * chunkSize)}.");
         }
 
         long sizePerWriter = chunksPerWriter * chunkSize;
         long total = sizePerWriter * writers;
         string[] files = oneFile
             ? [file]
-            : [.. Enumerable.Range(0, writers).Select(i => i == 0 ? file : $"{file}.{i}")];
+            : [file, .. Enumerable.Range(1, writers - 1).Select(i => $"{file}.{i}")];
         AlignedBuffer[] buffers = new AlignedBuffer[writers];
         for (int i = 0; i < writers; i++)
         {
@@ -132,7 +146,8 @@ internal static class WritePathExperiment
                     int writer = i;
                     threads[i] = new Thread(() =>
                     {
-                        SafeFileHandle handle = shared ?? Open(files[writer], unbuffered, preallocate ? sizePerWriter : 0);
+                        long preallocation = preallocate ? sizePerWriter : 0;
+                        SafeFileHandle handle = shared ?? Open(files[writer], unbuffered, preallocation);
                         long start = shared is null ? 0 : writer * sizePerWriter;
                         for (long offset = 0; offset < sizePerWriter; offset += chunkSize)
                         {

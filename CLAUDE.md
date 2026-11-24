@@ -32,12 +32,19 @@ dotnet test --solution FileSort.slnx -c Release --filter-namespace FileSort.Test
 ./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Assemblies FileSort.Generator,FileSort.Common,FileSort.Cli
 dotnet test --solution FileSort.slnx -c Release --filter-namespace FileSort.Tests.Checker* FileSort.Tests.Format* FileSort.Tests.Cli* --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Assemblies FileSort.Checker,FileSort.Cli
+dotnet test --solution FileSort.slnx -c Release --filter-namespace FileSort.Tests.Sorter* FileSort.Tests.Engine* FileSort.Tests.Format* FileSort.Tests.Cli* --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+./.github/scripts/coverage-summary.ps1 -Report TestResults/coverage.cobertura.xml -Assemblies FileSort.Sorter,FileSort.Engine,FileSort.Cli
 
 dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
 dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
+# The sorter runs on the .NET runtime: a framework-dependent build
+dotnet publish FileSort.Sorter -c Release -o publish/sorter
 
 # Generator: a test file in the ignored data/ directory (all options: --help, or FileSort.Generator/README.md)
 dotnet run -c Release --project FileSort.Generator -- --output data/test-1gb.txt --size 1GB --seed 1
+
+# Sorter: sort a file (all options: --help, or FileSort.Sorter/README.md)
+dotnet run -c Release --project FileSort.Sorter -- --input data/test-1gb.txt --output data/sorted-1gb.txt
 
 # Checker: is the second file the sorted version of the first? (all options: --help, or FileSort.Checker/README.md)
 dotnet run -c Release --project FileSort.Checker -- --input data/test-1gb.txt --sorted data/sorted-1gb.txt
@@ -51,14 +58,16 @@ dotnet run -c Release --project FileSort.Benchmarks -- micro --filter *
 dotnet run -c Release --project FileSort.Benchmarks -- write-path --file data/write-path.bin --writers 1 --pause 30
 dotnet run -c Release --project FileSort.Benchmarks -- file-sink --file data/file-sink.bin
 dotnet run -c Release --project FileSort.Benchmarks -- pipeline --sink discard
+dotnet run -c Release --project FileSort.Benchmarks -- block-merge
+dotnet run -c Release --project FileSort.Benchmarks -- sort-phases
+dotnet run -c Release --project FileSort.Benchmarks -- progress-cost
 
 # A sorted copy of a file of up to 2 GB, made in memory, and the check of the pair by chunk size and threads
 dotnet run -c Release --project FileSort.Benchmarks -- sorted-copy --input data/test-1gb.txt --output data/sorted-1gb.txt
 dotnet run -c Release --project FileSort.Benchmarks -- check --input data/test-1gb.txt --sorted data/sorted-1gb.txt
 ```
 
-`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`). Commands for running the sorter will be
-added with its CLI.
+`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`).
 
 A change that alters the bytes the generator writes for an existing seed raises `ContentFormat.Version` and records
 new reference hashes in `ReferenceFileTests`; a hash recorded for an existing version is never edited.
@@ -67,12 +76,13 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 
 - `FileSort.Common` holds the line format shared by the Generator and the Sorter.
 - `FileSort.Cli` holds the console plumbing shared by the console programs: exit codes, the console abstraction,
-  the progress line, Ctrl+C, command-line errors. It references `System.CommandLine` and nothing else. Console
+  the progress line, Ctrl+C, command-line errors, the parsers of sizes and whole numbers, the overwrite question. It
+  references `System.CommandLine` and nothing else. Console
   code never goes into `FileSort.Common`: the checker and the sorting engine must not get it through that
   reference.
-- The sorting engine lives in a class library with no console dependencies; `FileSort.Sorter` is only a thin CLI
-  host over it (arguments, console output, exit codes). The library is introduced together with the sorter
-  implementation.
+- The sorting engine lives in `FileSort.Engine`, a class library with no console dependencies (a test checks its
+  references); `FileSort.Sorter` is only a thin CLI host over it (arguments, console output, progress, exit codes).
+  Spectre.Console, which draws the sorter's progress, is referenced by `FileSort.Sorter` and nothing else.
 - `FileSort.Checker` must not reference `FileSort.Common`. It is an independent oracle with its own deliberately
   simple parsing and comparison, so a bug in the optimized code cannot be confirmed by the same code.
 - The Generator and the Checker also ship as self-contained single-file executables (`dotnet publish -r <rid>`): in
@@ -118,6 +128,11 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
   benchmark shows the gain, and a comment next to it says so.
 - Use a primary constructor where a constructor only stores its parameters; keep private fields, initialized from
   the parameters, so the `_field` naming stays. A constructor that validates or computes stays an ordinary one.
+- Lines read at a glance. A line, code or comment, is at most 120 characters; a longer call or signature is wrapped,
+  one argument or parameter per line when they do not fit on one continuation line, and a value computed for an
+  argument gets a local with a name. No lambda inside a lambda: the inner one becomes a named method. LINQ is for
+  plain projections and filters; work with side effects, such as starting threads or writing, goes in a loop. `?:`
+  and `?? throw` only when the whole expression is short; otherwise an `if`.
 - Keep methods flat, about two levels of nesting. State that several steps of a method share becomes a small type
   with named methods, not a local function that captures the method's locals; a `try`, a loop or a branch that
   would nest deeper becomes a method with a name.
@@ -152,13 +167,15 @@ Each significant piece of work (generator, sorter, checker, report) goes through
 Small fixes don't need a change. The README's assumptions move into `openspec/specs/` as changes get archived.
 
 Continuous integration is in `.github/workflows/`. Every program has a workflow of its own (`generator.yml`,
-`checker.yml`), started by the changes that can affect it (not by documentation or `openspec/` alone); each calls
-`test-program.yml`, which builds the solution, runs the tests of the program's namespaces and checks the coverage
-of its assemblies. `publish.yml` builds the executable of the generator or of the checker by hand. What CI runs is
-what the Commands above run: change a command there and here together. A new program gets a workflow of its own
-that calls `test-program.yml` and, when it ships as an executable, an option in `publish.yml`. A new test
-namespace is added to the workflow of its program: tests in a namespace that no workflow names do not run in CI.
-Test results leave the run as JUnit XML and as a Markdown summary; coverage as Cobertura.
+`checker.yml`, `sorter.yml`), started by the changes that can affect it (not by documentation or `openspec/`
+alone); each calls `test-program.yml`, which builds the solution, runs the tests of the program's namespaces and
+checks the coverage of its assemblies. `publish.yml` builds the executable of the generator or of the checker by
+hand; the sorter runs on the .NET runtime and is not in it. What CI runs is what the Commands above run: change a
+command there and here together. A new program gets a workflow of its own that calls `test-program.yml` and, when
+it ships as an executable, an option in `publish.yml`. A new test namespace is added to the workflow of its
+program: tests in a namespace that no workflow names do not run in CI. A test helper that the tests of another
+program use is listed by name in that program's path filters. Test results leave the run as JUnit XML and as a
+Markdown summary; coverage as Cobertura.
 
 Rules for every change:
 

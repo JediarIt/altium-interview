@@ -7,7 +7,8 @@ namespace FileSort.Tests.Format;
 /// </summary>
 internal static class SortOrderScenarios
 {
-    /// <summary>The name of the scenario, its lines as the scenario lists them, and the same lines in sorted order.</summary>
+    /// <summary>The name of the scenario, its lines as the scenario lists them, and the same lines in sorted
+    /// order.</summary>
     public static TheoryData<string, string[], string[]> Orders => new()
     {
         // Requirement: Order by String

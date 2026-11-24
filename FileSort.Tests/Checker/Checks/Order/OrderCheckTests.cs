@@ -15,6 +15,12 @@ public class OrderCheckTests
         return (order.Result, [.. order.Violations]);
     }
 
+    // The digits of the Number of a valid line, or -1 for a line that is not valid.
+    private static int NumberLengthOrMinusOne(byte[] line)
+    {
+        return LineParser.Parse(line, out int length) == LineFault.None ? length : -1;
+    }
+
     // The lines as one chunk: their numbers count from 1.
     private static ChunkOrder Order(params string[] lines)
     {
@@ -53,7 +59,11 @@ public class OrderCheckTests
     public void Lines_in_order_have_no_violations()
     {
         (OrderResult result, List<OrderViolation> reported) = Check(
-            "1. Apple", "415. Apple", "2. Banana is yellow", "32. Cherry is the best", "30432. Something something something");
+            "1. Apple",
+            "415. Apple",
+            "2. Banana is yellow",
+            "32. Cherry is the best",
+            "30432. Something something something");
 
         Assert.Equal(new OrderResult(0, 0, 0), result);
         Assert.Empty(reported);
@@ -92,7 +102,8 @@ public class OrderCheckTests
     public void A_smaller_Number_after_a_greater_String_is_a_violation_of_the_Strings()
     {
         // The Numbers take part only when the Strings are equal.
-        Assert.Equal(OrderViolationKind.StringsOutOfOrder, Assert.Single(Check("1. Banana", "999. Apple").Reported).Kind);
+        OrderViolation violation = Assert.Single(Check("1. Banana", "999. Apple").Reported);
+        Assert.Equal(OrderViolationKind.StringsOutOfOrder, violation.Kind);
         Assert.Empty(Check("999. Apple", "1. Banana").Reported);
     }
 
@@ -117,7 +128,9 @@ public class OrderCheckTests
     [Fact]
     public void Every_neighbouring_pair_with_equal_keys_and_different_bytes_is_counted()
     {
-        Assert.Equal(3, Check("7. Apple", "07. Apple", "007. Apple", "7. Apple", "7. Apple", "8. Apple").Result.EqualKeyPairs);
+        Assert.Equal(
+            3,
+            Check("7. Apple", "07. Apple", "007. Apple", "7. Apple", "7. Apple", "8. Apple").Result.EqualKeyPairs);
     }
 
     [Fact]
@@ -165,8 +178,10 @@ public class OrderCheckTests
     {
         Assert.Equal(
             default,
-            Check("18446744073709551615. Apple", "18446744073709551616. Apple", "100000000000000000000000000000. Apple").Result);
-        Assert.Equal(1, Check("100000000000000000000000000000. Apple", "18446744073709551616. Apple").Result.Violations);
+            Check("18446744073709551615. Apple", "18446744073709551616. Apple", "100000000000000000000000000000. Apple")
+                .Result);
+        Assert.Equal(
+            1, Check("100000000000000000000000000000. Apple", "18446744073709551616. Apple").Result.Violations);
     }
 
     // The last line of the chunk before, in front of the lines of this one
@@ -247,14 +262,15 @@ public class OrderCheckTests
         Assert.NotEmpty(scenario);
         Assert.Equal(lines.Length, expected.Length);
         byte[][] sorted = [.. expected.Select(Encoding.UTF8.GetBytes)];
-        int[] numberLengths = [.. sorted.Select(line => LineParser.Parse(line, out int length) == LineFault.None ? length : -1)];
+        int[] numberLengths = [.. sorted.Select(NumberLengthOrMinusOne)];
         Assert.DoesNotContain(-1, numberLengths);
 
         for (int i = 0; i < sorted.Length; i++)
         {
             for (int j = i + 1; j < sorted.Length; j++)
             {
-                Assert.Equal(OrderVerdict.InOrder, OrderCheck.Judge(sorted[i], numberLengths[i], sorted[j], numberLengths[j]));
+                OrderVerdict verdict = OrderCheck.Judge(sorted[i], numberLengths[i], sorted[j], numberLengths[j]);
+                Assert.Equal(OrderVerdict.InOrder, verdict);
                 OrderVerdict reversed = OrderCheck.Judge(sorted[j], numberLengths[j], sorted[i], numberLengths[i]);
                 Assert.True(
                     reversed is OrderVerdict.StringsOutOfOrder or OrderVerdict.NumbersOutOfOrder,

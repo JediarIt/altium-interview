@@ -114,9 +114,9 @@ words.
 
 ### Requirement: Edge cases
 `--edge-cases <list>` SHALL add valid but unusual lines to the output. The list names categories, separated by
-commas: `unicode`, `separator`, `case`, `big-numbers`, `leading-zeros` and `empty`; `all` enables every one. With
-the default `--words` and `--duplicates`, each enabled category SHALL affect at least 1% of the lines of any output
-of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
+commas: `unicode`, `separator`, `case`, `big-numbers`, `leading-zeros`, `empty` and `carriage-return`; `all` enables
+every one. With the default `--words` and `--duplicates`, each enabled category SHALL affect at least 1% of the lines
+of any output of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
 
 #### Scenario: Category unicode
 - **WHEN** a file of 1 MB is generated with `--edge-cases unicode`
@@ -135,16 +135,20 @@ of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
 
 #### Scenario: Category big-numbers
 - **WHEN** a file of 1 MB is generated with `--edge-cases big-numbers`
-- **THEN** Numbers greater than 4294967295 occur, among them 4294967296, 9223372036854775807, 9223372036854775808 and
-  18446744073709551615
+- **THEN** Numbers greater than 4294967295 occur, among them 4294967296, 9223372036854775807, 9223372036854775808,
+  18446744073709551615 and 18446744073709551616, and so do Numbers of more than 20 digits
 
 #### Scenario: Category leading-zeros
 - **WHEN** a file of 1 MB is generated with `--edge-cases leading-zeros`
-- **THEN** some Numbers have two or more digits and begin with `0`, and no Number has more than 20 digits
+- **THEN** some Numbers have two or more digits and begin with `0`
 
 #### Scenario: Category empty
 - **WHEN** a file of 1 MB is generated with `--edge-cases empty`
 - **THEN** some lines end right after the separator
+
+#### Scenario: Category carriage-return
+- **WHEN** a file of 1 MB is generated with `--edge-cases carriage-return`
+- **THEN** some Strings end with a carriage return, and the String of the first line does not
 
 #### Scenario: All categories
 - **WHEN** a file of 1 MB is generated with `--edge-cases all`
@@ -157,17 +161,23 @@ of 1 MB or more. A category that is not enabled SHALL NOT appear in the output.
 ### Requirement: Line ending
 `--line-ending` SHALL accept `lf` (the default on every operating system) or `crlf` and SHALL set the line ending of
 the output, `\n` or `\r\n`, in the sense of the `line-format` capability. A carriage return SHALL appear in the output
-only as part of a `\r\n` terminator, never inside a String, so the line ending of a generated file can be told from
-any of its lines.
+only as part of a `\r\n` terminator or as the last byte of a String of the category `carriage-return`, which the
+first line never has, so the line ending of a generated file can be told from its first line.
 
 #### Scenario: Default on Windows
-- **WHEN** a file is generated on Windows without `--line-ending`
+- **WHEN** a file is generated on Windows without `--line-ending` and without the category `carriage-return`
 - **THEN** the output contains no carriage return
 
 #### Scenario: Carriage return and line feed
-- **WHEN** a file is generated with `--line-ending crlf`
+- **WHEN** a file is generated with `--line-ending crlf` and without the category `carriage-return`
 - **THEN** every line is followed by `\r\n`, no line feed appears without a carriage return before it, and no
   carriage return appears without a line feed after it
+
+#### Scenario: Line ending of the first line
+- **WHEN** a file is generated with `--edge-cases carriage-return`, once with `--line-ending lf` and once with
+  `--line-ending crlf`
+- **THEN** the first line of the first file ends with a line feed that has no carriage return before it, and the
+  first line of the second file ends with `\r\n` preceded by a byte that is not a carriage return
 
 ### Requirement: Deterministic output
 The bytes of the output SHALL depend only on the seed, on `--size`, `--duplicates`, `--words`, `--edge-cases` and

@@ -24,14 +24,17 @@ public class LineComparerTests
 
     private static int NaiveCompare(byte[] x, byte[] y)
     {
-        return Math.Sign(NaiveLineComparer.Instance.Compare(NaiveLineParser.ParseLine(x), NaiveLineParser.ParseLine(y)));
+        NaiveLine? first = NaiveLineParser.ParseLine(x);
+        NaiveLine? second = NaiveLineParser.ParseLine(y);
+        return Math.Sign(NaiveLineComparer.Instance.Compare(first, second));
     }
 
     // Requirements: Order by String, Order by Number
 
     [Theory]
     [MemberData(nameof(SortOrderScenarios.Orders), MemberType = typeof(SortOrderScenarios))]
-    public void Every_line_of_a_scenario_comes_before_the_lines_after_it(string scenario, string[] lines, string[] expected)
+    public void Every_line_of_a_scenario_comes_before_the_lines_after_it(
+        string scenario, string[] lines, string[] expected)
     {
         Assert.NotEmpty(scenario);
         Assert.Equal(lines.Length, expected.Length);
@@ -113,7 +116,8 @@ public class LineComparerTests
 
         // Neighbours, and pairs from all over the file. Sorting first puts lines with equal Strings side by side,
         // so the Numbers decide for many of the neighbours.
-        List<byte[]> sorted = [.. NaiveSort.Sort(lines.ConvertAll(line => NaiveLineParser.ParseLine(line)!)).Select(line => line.ToBytes())];
+        List<NaiveLine> parsed = lines.ConvertAll(line => NaiveLineParser.ParseLine(line)!);
+        List<byte[]> sorted = [.. NaiveSort.Sort(parsed).Select(line => line.ToBytes())];
         int decidedByNumber = 0;
         for (int i = 1; i < sorted.Count; i++)
         {
@@ -123,7 +127,9 @@ public class LineComparerTests
             Assert.Equal(NaiveCompare(sorted[i], sorted[i - 1]), Compare(sorted[i], sorted[i - 1]));
             Assert.Equal(NaiveCompare(sorted[i], other), Compare(sorted[i], other));
 
-            bool sameString = NaiveLineParser.ParseLine(sorted[i])!.Text.AsSpan().SequenceEqual(NaiveLineParser.ParseLine(sorted[i - 1])!.Text);
+            NaiveLine line = NaiveLineParser.ParseLine(sorted[i])!;
+            NaiveLine previous = NaiveLineParser.ParseLine(sorted[i - 1])!;
+            bool sameString = line.Text.AsSpan().SequenceEqual(previous.Text);
             decidedByNumber += sameString ? 1 : 0;
         }
 
@@ -139,7 +145,8 @@ public class LineComparerTests
         for (int i = 0; i < 400; i++)
         {
             // 1 to 40 digits, a quarter of them with zeros in front: far beyond the 20 digits of 64 bits.
-            string digits = string.Concat(Enumerable.Range(0, random.Next(1, 41)).Select(_ => (char)('0' + random.Next(10))));
+            int count = random.Next(1, 41);
+            string digits = string.Concat(Enumerable.Range(0, count).Select(_ => (char)('0' + random.Next(10))));
             string zeros = new('0', random.Next(4) == 0 ? random.Next(1, 4) : 0);
             lines.Add(Encoding.ASCII.GetBytes($"{zeros}{digits}. {strings[random.Next(strings.Length)]}"));
         }

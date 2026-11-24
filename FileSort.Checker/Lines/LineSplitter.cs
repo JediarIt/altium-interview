@@ -30,7 +30,8 @@ internal ref struct LineSplitter
         _maxLineLength = maxLineLength;
     }
 
-    /// <summary>The number of the line that <see cref="TryRead"/> found last, from 1 for the first line of the bytes.</summary>
+    /// <summary>The number of the line that <see cref="TryRead"/> found last, from 1 for the first line of the
+    /// bytes.</summary>
     public int LineNumber { get; private set; }
 
     /// <summary>The offset of the first byte of that line from the start of the bytes.</summary>

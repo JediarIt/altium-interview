@@ -39,7 +39,8 @@ internal static class CheckerApp
         return CommandRunner.Run(command.Root, args, console);
     }
 
-    private static int Check(CheckerSettings settings, ScanSettings scan, IAppConsole console, CancellationToken cancellationToken)
+    private static int Check(
+        CheckerSettings settings, ScanSettings scan, IAppConsole console, CancellationToken cancellationToken)
     {
         try
         {
@@ -61,7 +62,8 @@ internal static class CheckerApp
         }
     }
 
-    private static int CheckFiles(CheckerSettings settings, ScanSettings scan, IAppConsole console, CancellationToken cancellationToken)
+    private static int CheckFiles(
+        CheckerSettings settings, ScanSettings scan, IAppConsole console, CancellationToken cancellationToken)
     {
         string inputPath = FullPath(settings.InputPath);
         string sortedPath = FullPath(settings.SortedPath);
@@ -169,7 +171,8 @@ internal static class CheckerApp
     }
 
     // A failure here is the console's: the progress line reports its own failures the same way.
-    private static void WriteSettings(IAppConsole console, string inputPath, string sortedPath, CheckerSettings settings)
+    private static void WriteSettings(
+        IAppConsole console, string inputPath, string sortedPath, CheckerSettings settings)
     {
         try
         {

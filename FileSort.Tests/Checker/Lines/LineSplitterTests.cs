@@ -18,7 +18,10 @@ public class LineSplitterTests
     // The checker's types are internal, so a theory names a line ending and gets the value here.
     private static LineEnding Ending(string name) => name == "crlf" ? LineEnding.CrLf : LineEnding.Lf;
 
-    private static List<ReadLine> Lines(string file, LineEnding lineEnding) => ReadFile.From(Utf8(file), lineEnding).Lines;
+    private static List<ReadLine> Lines(string file, LineEnding lineEnding)
+    {
+        return ReadFile.From(Utf8(file), lineEnding).Lines;
+    }
 
     // Requirement: Line terminator
 
@@ -418,7 +421,8 @@ public class LineSplitterTests
     [Fact]
     public void Lines_are_numbered_from_one_and_their_offsets_count_from_the_start_of_the_bytes()
     {
-        LineSplitter splitter = new("1. Apple\r\n2. Banana\r\n3. Cherry"u8, LineEnding.CrLf, endsFile: true, maxLineLength: 100);
+        LineSplitter splitter = new(
+            "1. Apple\r\n2. Banana\r\n3. Cherry"u8, LineEnding.CrLf, endsFile: true, maxLineLength: 100);
         List<(int Number, int Offset, bool HasTerminator)> lines = [];
 
         while (splitter.TryRead(out _) == LineRead.Line)

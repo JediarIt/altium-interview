@@ -58,7 +58,7 @@ A file made with default options looks like this:
 | `--seed` | The seed of the content. | A whole number from 0 to 18446744073709551615 | Random; the summary prints the seed used |
 | `--duplicates` | The probability, in percent, that a line takes its String from a pool of 1024 repeated Strings. | A whole number from 0 to 100 | `30` |
 | `--words` | The number of words in a String. | A number (`4`) or a range (`2-7`), from 1 to 1024 | `1-5` |
-| `--edge-cases` | Adds valid but unusual lines, see [Edge cases](#edge-cases). | Category names separated by commas: `unicode`, `separator`, `case`, `big-numbers`, `leading-zeros`, `empty`; or `all` | None: every line is plain |
+| `--edge-cases` | Adds valid but unusual lines, see [Edge cases](#edge-cases). | Category names separated by commas: `unicode`, `separator`, `case`, `big-numbers`, `leading-zeros`, `empty`, `carriage-return`; or `all` | None: every line is plain |
 | `--line-ending` | The line ending of the file, the same on every operating system. | `lf` (`\n`) or `crlf` (`\r\n`) | `lf` |
 | `--threads` | The largest number of threads that generate content at the same time. It does not change the content. | A whole number from 1 to 256 | The number of logical processors |
 | `--overwrite` | Replaces an existing output file without asking. | A flag | Off: the generator asks |
@@ -98,12 +98,16 @@ with probability 1/16, independently of the others.
 | `unicode` | Words without ASCII characters: Cyrillic, Greek, CJK, fullwidth forms, emoji, and one word spelled with a precomposed and with a decomposed letter | Comparing UTF-16 code units or culture rules instead of bytes; cutting a multi-byte character |
 | `separator` | `. ` inside the String, a String that begins with digits and `. `, or a String that begins with a space | Splitting at the last `. ` instead of the first; trimming |
 | `case` | Dictionary words in lower case, capitalized and in upper case, in any position (the non-ASCII words of `unicode` keep their own spelling) | Case-insensitive comparison |
-| `big-numbers` | Numbers above 4294967295, among them 4294967296, 9223372036854775807, 9223372036854775808 and 18446744073709551615 | Parsing the Number as a 32-bit or signed 64-bit integer |
-| `leading-zeros` | 1 to 3 zeros in front of the Number, never more than 20 digits | Comparing Numbers as text or by length |
+| `big-numbers` | Numbers above 4294967295, among them 4294967296, 9223372036854775807, 9223372036854775808, 18446744073709551615 and 18446744073709551616, and Numbers of 21 to 30 digits, which do not fit in 64 bits | Parsing the Number as a 32-bit or 64-bit integer, signed or not |
+| `leading-zeros` | 1 to 3 zeros in front of the Number; together with `big-numbers` a Number has up to 33 digits | Comparing Numbers as text or by length |
 | `empty` | An empty String | Assuming at least one character after the separator |
+| `carriage-return` | A carriage return at the end of the String; never on the first line of the file | Trimming the String, or taking a lone `\r` as the end of a line; in a `\r\n` file the line ends with `\r\r\n` |
 
 Edge cases never change the number of words, except `empty`. Pool Strings carry them too, so unusual Strings also
-repeat.
+repeat. The carriage return is decided for the line, not for the String: one pool String appears with it on some
+lines and without it on others, and an empty String with it is a single carriage return. The first line never gets
+one, so a reader that takes the line ending from the first line of a file, as the sorter and the checker do by
+default, reads every generated file with the line ending it was written with.
 
 ## Reproducible files
 
@@ -118,7 +122,7 @@ Size:             1073741831 bytes (1.00 GiB)
 Lines:            43065356
 Average line:     24.9 bytes
 Seed:             1
-Content version:  1
+Content version:  2
 Write mode:       unbuffered, 16 threads
 Elapsed:          0.80 s
 Throughput:       1276 MiB/s
@@ -137,7 +141,14 @@ How it is achieved:
   point, no culture, no `Environment.NewLine`.
 - Everything the bytes depend on (dictionary, block size, pool size, edge case rates, the way random bits are used)
   is frozen under the content version, which the summary prints. Tests pin the SHA-256 of two reference files for
-  the current version; a change that alters the bytes fails them until the version is raised.
+  every version; a change that alters the bytes fails them until the version is raised.
+
+The content versions so far:
+
+| Version | What changed |
+|---|---|
+| 1 | The first version. |
+| 2 | `big-numbers` also writes 18446744073709551616 and Numbers of 21 to 30 digits, and the category `carriage-return` is new. Files made without `--edge-cases` keep their bytes: the reference file with default options has the same hash in both versions. Files made with edge cases differ. |
 
 ## Writing the file
 
@@ -170,7 +181,7 @@ How it is achieved:
   Threads:          16
   Write mode:       unbuffered
   Overwrite:        no
-  Content version:  1
+  Content version:  2
   ```
 - Progress (percentage, throughput, time left) is shown on the error stream unless it is redirected. The summary
   goes to standard output and nothing else does, so it can be redirected to a file or read by a script. If standard
@@ -358,9 +369,14 @@ BenchmarkDotNet, one core (`micro --filter *`):
 | | `Ascii.ToUpperInPlace` on its first byte | 5.30 ns | 2.4 |
 | One block of 1 MiB, default options | | 2.48 ms: 404 MiB/s | |
 | One block of 1 MiB, `--words 1` | | 2.84 ms: 353 MiB/s | |
-| One block of 1 MiB, `--edge-cases all` | | 2.70 ms: 370 MiB/s | |
+| One block of 1 MiB, `--edge-cases all` | | 3.36 ms: 298 MiB/s | |
 
 - **Zero bytes are allocated per block** in all three block benchmarks.
+- The row of `--edge-cases all` is of content version 2, measured again on another day with
+  `micro --filter *BlockBenchmarks*`: 3.36 and 3.40 ms in two runs, in which the default row gave 2.20 and 2.65 ms.
+  Version 1 measured 2.70 ms, 9% above the default row; version 2 is about a third above it. Version 2 makes one
+  line in 128 a Number of 21 to 30 digits, with 128-bit arithmetic and formatting; that this is the cause is likely
+  and was not measured on its own.
 - A new generator per block is why the generator cannot use `System.Random`: each block has its own random stream,
   and creating a seeded `System.Random` costs about 1.9 µs.
 - The Number and the word benchmarks run over a million values, not over a short series repeated in a loop. With a
@@ -368,7 +384,8 @@ BenchmarkDotNet, one core (`micro --filter *`):
   heart, and the cost that the loop-free writer removes, a digit loop whose length is random, disappears from the
   measurement. In the generator no series repeats.
 - The loop-free writer handles the Numbers of plain lines, which fit in 32 bits. The rare Numbers that it cannot
-  write (above 32 bits, or with leading zeros) go through the framework's `Utf8Formatter`. A hand-written writer
+  write (above 32 bits, or with leading zeros) go through the framework's `Utf8Formatter`, and those above 64 bits
+  through the formatting of `UInt128`. A hand-written writer
   with a digit loop was measured too, at 19.4 ns, slower than the framework's; it was removed.
 - The block benchmarks give about 400 MiB/s per core, the pipeline benchmark with one thread 471 MiB/s (the table
   in [Where the limit is](#where-the-limit-is)). The same code runs in both; they were measured in different
@@ -450,16 +467,17 @@ the generator.
   of hand-written parsing and help text. Version 2.0.15 is the latest patch of the line released with .NET 10;
   3.0.0 was a few days old when this was decided. It is the only NuGet package of the generator, and a check
   publish with trimming confirms that it does not break the self-contained executable. What the programs do the
-  same way around the parser (errors that name their option, the exit codes, the console, Ctrl+C) lives in the
-  shared library `FileSort.Cli`, see the [root README](../README.md#design-decisions). The benchmark project uses
-  the same parser and the generator's own size parser, so options are declared, checked and documented in one way
-  everywhere.
+  same way around the parser (errors that name their option, the exit codes, the console, Ctrl+C, the parsing of
+  sizes and whole numbers, the question before an existing output is replaced) lives in the shared library
+  `FileSort.Cli`, see the [root README](../README.md#design-decisions). The benchmark project uses the same parser
+  and the same size parser, so options are declared, checked and documented in one way everywhere.
 - **No console UI framework.** Libraries such as Spectre.Console or RazorConsole draw tables, progress bars and
   whole screens. The generator prints eleven lines of settings, one progress line and eleven lines of summary, and
   that does not pay for a second dependency in a tool that has to pass the trim check and to start fast as a single
   file. Its output is also meant to be read by scripts: plain `Name: value` lines on standard output, which a
-  framework that redraws the screen would get in the way of. The question is open again for the sorter, which has
-  several phases to show and no trimming requirement.
+  framework that redraws the screen would get in the way of. The sorter, which has several phases to show and no
+  trimming requirement, draws its progress with Spectre.Console (see
+  [its README](../FileSort.Sorter/README.md#design-decisions)).
 
 ## Tests
 
@@ -473,8 +491,9 @@ the generator.
 
 ## Limitations
 
-- **No malformed files.** The generator writes valid lines only. A flag for deliberately invalid lines waits for
-  the sorter's policy on malformed input, because that policy defines what such a flag should produce.
+- **No malformed files.** The generator writes valid lines only. The sorter and the checker stop at the first
+  invalid line, so a file with one invalid line shows how they report it; such files are small and made by hand,
+  and a flag for them is not written.
 - **No custom dictionary.** Strings come from the built-in list of 1024 words.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine. Unbuffered writes are used on Windows only; Linux and macOS use the buffered mode of the same code, and

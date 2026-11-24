@@ -8,8 +8,8 @@ using CommonLineEnding = FileSort.Common.LineEnding;
 namespace FileSort.Tests.Checker.Checks;
 
 /// <summary>
-/// Correct pairs: a file made by the generator, with hand-written lines that the generator cannot write yet, and
-/// its copy sorted by the naive sort of the tests. The checker must find every one of them correct.
+/// Correct pairs: a file made by the generator, with hand-written lines that the generator writes rarely or not at
+/// all, and its copy sorted by the naive sort of the tests. The checker must find every one of them correct.
 /// </summary>
 public class CorrectPairTests
 {
@@ -41,7 +41,8 @@ public class CorrectPairTests
     [InlineData(4096, 3)]
     [InlineData(65536, 16)]
     [InlineData(4 * 1024 * 1024, 1)]
-    public void The_result_does_not_depend_on_the_size_of_a_chunk_or_on_the_number_of_threads(int chunkSize, int threads)
+    public void The_result_does_not_depend_on_the_size_of_a_chunk_or_on_the_number_of_threads(
+        int chunkSize, int threads)
     {
         SortedPair pair = SortedPair.Generated(EdgeCases.All, CommonLineEnding.CrLf, seed: 12);
         CheckResult expected = TestCheck.Run(pair.Input, pair.Output);

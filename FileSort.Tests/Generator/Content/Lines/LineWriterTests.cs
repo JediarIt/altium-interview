@@ -106,28 +106,28 @@ public class LineWriterTests
     }
 
     [Theory]
-    [InlineData(7UL, 2, "007")]
-    [InlineData(0UL, 1, "00")]
-    [InlineData(415UL, 0, "415")]
-    [InlineData(1UL, 19, "00000000000000000001")]
-    [InlineData(1844674407370955161UL, 1, "01844674407370955161")]
-    public void Zero_padded_Numbers(ulong value, int leadingZeros, string expected)
+    [InlineData("7", 2, "007")]
+    [InlineData("0", 1, "00")]
+    [InlineData("415", 0, "415")]
+    [InlineData("1", 19, "00000000000000000001")]
+    [InlineData("1844674407370955161", 1, "01844674407370955161")]
+    [InlineData("18446744073709551615", 3, "00018446744073709551615")]
+    [InlineData("18446744073709551616", 0, "18446744073709551616")]
+    [InlineData("999999999999999999999999999999", 3, "000999999999999999999999999999999")]
+    public void Zero_padded_Numbers_of_up_to_128_bits(string value, int leadingZeros, string expected)
     {
-        byte[] buffer = new byte[LineFormat.MaxNumberDigits];
+        byte[] buffer = new byte[LineComposer.MaxNumberDigits];
 
-        int length = LineWriter.WriteNumber(buffer, value, leadingZeros);
+        int length = LineWriter.WriteNumber(buffer, UInt128.Parse(value, CultureInfo.InvariantCulture), leadingZeros);
 
         Assert.Equal(expected, Encoding.ASCII.GetString(buffer, 0, length));
     }
 
-    [Theory]
-    [InlineData(18446744073709551615UL, 1)]
-    [InlineData(7UL, 20)]
-    [InlineData(7UL, -1)]
-    public void A_Number_never_gets_more_than_20_digits(ulong value, int leadingZeros)
+    [Fact]
+    public void A_negative_count_of_zeros_or_a_destination_too_small_is_refused()
     {
-        byte[] buffer = new byte[64];
-
-        Assert.Throws<ArgumentOutOfRangeException>(() => LineWriter.WriteNumber(buffer, value, leadingZeros));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LineWriter.WriteNumber(new byte[64], 7UL, -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LineWriter.WriteNumber(new byte[2], 7UL, 3));
+        Assert.Throws<ArgumentException>(() => LineWriter.WriteNumber(new byte[20], UInt128.MaxValue, 0));
     }
 }

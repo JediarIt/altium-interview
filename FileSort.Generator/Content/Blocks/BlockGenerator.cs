@@ -46,7 +46,9 @@ internal sealed class BlockGenerator
 
         while (position <= limit)
         {
-            position += _lines.WriteLine(ref random, buffer[position..]);
+            // The first line of the first block is the first line of the file.
+            bool firstLineOfFile = blockIndex == 0 && lines == 0;
+            position += _lines.WriteLine(ref random, buffer[position..], firstLineOfFile);
             lines++;
         }
 

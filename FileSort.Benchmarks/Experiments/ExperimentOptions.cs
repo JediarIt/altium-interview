@@ -2,13 +2,13 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
 
-using FileSort.Generator.Cli.Options;
+using FileSort.Cli.Options;
 
 namespace FileSort.Benchmarks.Experiments;
 
 /// <summary>
-/// The options that the experiments share, built on System.CommandLine like the generator's own command line. Sizes
-/// are parsed by the generator's <see cref="SizeParser"/>, so <c>--size</c> means the same in both programs.
+/// The options that the experiments share, built on System.CommandLine like the command lines of the programs. Sizes
+/// are parsed by the shared <see cref="SizeParser"/>, so <c>--size</c> means the same here as in the programs.
 /// </summary>
 internal static class ExperimentOptions
 {
@@ -29,22 +29,22 @@ internal static class ExperimentOptions
 
     public static Option<long> Size()
     {
-        return new Option<long>("--size")
-        {
-            Description = "The bytes written by one run, in the units of the generator: 64MB, 1GiB. A series writes "
-                + "this size times its combinations times its runs: mind the total, it wears the disk.",
-            HelpName = "size",
-            DefaultValueFactory = _ => 1L << 30,
-            CustomParser = result =>
-            {
-                if (SizeParser.TryParse(result.Tokens[0].Value, out long bytes, out string? error))
-                {
-                    return bytes;
-                }
+        return Size(
+            "--size",
+            "The bytes written by one run, in the units of the generator: 64MB, 1GiB. A series writes this size times "
+            + "its combinations times its runs: mind the total, it wears the disk.",
+            1L << 30);
+    }
 
-                result.AddError(error);
-                return 0;
-            },
+    /// <summary>A size in the units of the generator, such as <c>64MB</c>, under any name.</summary>
+    public static Option<long> Size(string name, string description, long fallback)
+    {
+        return new Option<long>(name)
+        {
+            Description = description,
+            HelpName = "size",
+            DefaultValueFactory = _ => fallback,
+            CustomParser = CustomParsers.From<long>(SizeParser.TryParse),
         };
     }
 

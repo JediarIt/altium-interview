@@ -54,7 +54,8 @@ public class FileSinkTests
     [InlineData(false)]
     public void The_file_equals_the_content_for_sizes_around_a_chunk(bool unbuffered)
     {
-        foreach (long size in new long[] { SmallChunk - 1, SmallChunk, SmallChunk + 1, (3 * SmallChunk) - 40, 3 * SmallChunk })
+        long[] sizes = [SmallChunk - 1, SmallChunk, SmallChunk + 1, (3 * SmallChunk) - 40, 3 * SmallChunk];
+        foreach (long size in sizes)
         {
             AssertFileEqualsHashingSink(size, unbuffered, SmallChunk);
         }
@@ -75,7 +76,8 @@ public class FileSinkTests
         Assert.Equal(0, FileSink.BufferedChunkSize % FileSink.Alignment);
         using TempDirectory directory = new();
 
-        Assert.Throws<ArgumentException>(() => new FileSink(directory.File("out.txt"), 0, unbuffered: true, chunkSize: 5000));
+        Assert.Throws<ArgumentException>(
+            () => new FileSink(directory.File("out.txt"), 0, unbuffered: true, chunkSize: 5000));
         Assert.Empty(directory.FileNames());
     }
 
@@ -207,7 +209,8 @@ public class FileSinkTests
     [InlineData(4096 - 30, 30, 4096)]
     [InlineData(4096 - 29, 30, 8192)]
     [InlineData(1L << 30, 100, (1L << 30) + 4096)]
-    public void The_required_space_is_the_size_plus_one_line_padded_to_whole_sectors(long size, int maxLine, long expected)
+    public void The_required_space_is_the_size_plus_one_line_padded_to_whole_sectors(
+        long size, int maxLine, long expected)
     {
         Assert.Equal(expected, OutputSpace.Required(size, maxLine));
     }
@@ -240,8 +243,10 @@ public class FileSinkTests
 
         // Outside Windows the free space is asked of this directory: the output's own directories may not exist yet.
         Assert.Equal(directory.Path, OutputSpace.NearestExistingDirectory(directory.File("out.txt")));
-        Assert.Equal(directory.File("a"), OutputSpace.NearestExistingDirectory(directory.File(Path.Combine("a", "out.txt"))));
-        Assert.Equal(directory.File("a"), OutputSpace.NearestExistingDirectory(directory.File(Path.Combine("a", "b", "c", "out.txt"))));
+        string inA = directory.File(Path.Combine("a", "out.txt"));
+        string deepInA = directory.File(Path.Combine("a", "b", "c", "out.txt"));
+        Assert.Equal(directory.File("a"), OutputSpace.NearestExistingDirectory(inA));
+        Assert.Equal(directory.File("a"), OutputSpace.NearestExistingDirectory(deepInA));
         Assert.True(string.IsNullOrEmpty(OutputSpace.NearestExistingDirectory("out.txt")));
     }
 

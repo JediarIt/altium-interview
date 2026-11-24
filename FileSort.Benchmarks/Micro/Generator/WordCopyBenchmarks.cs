@@ -42,7 +42,8 @@ public class WordCopyBenchmarks
             position = 0;
             foreach (int index in _indexes.AsSpan(start, Batch))
             {
-                slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize).CopyTo(buffer.Slice(position, Dictionary.SlotSize));
+                ReadOnlySpan<byte> slot = slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize);
+                slot.CopyTo(buffer.Slice(position, Dictionary.SlotSize));
                 position += lengths[index];
                 buffer[position++] = (byte)' ';
             }

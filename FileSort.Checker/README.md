@@ -148,8 +148,9 @@ An output written with another line ending than its input does not pass, and the
 
 The detection is wrong in two cases, and `--line-ending` fixes both: a `\r\n` file of one line without a
 terminator is taken for an `\n` file (and read correctly all the same), and an `\n` file whose first String ends
-with a carriage return is taken for an `\r\n` file. The generator never writes such a String. The report of an
-invalid line names the line ending and, when it was detected, the option.
+with a carriage return is taken for an `\r\n` file. The generator writes Strings that end with a carriage return
+(`--edge-cases carriage-return`), but never on the first line, so its files are always detected right. The report
+of an invalid line names the line ending and, when it was detected, the option.
 
 ### Byte order mark
 
@@ -287,8 +288,8 @@ start of the reading to its end, so it leaves out the start of the process and t
 The requirement is a pair of 1 GB in under 3 seconds, the rate at which a pair of 100 GB takes 5 minutes; at the
 measured rate it takes about 3 minutes, if the disk keeps up. Memory must stay under 256 MB and must not follow
 the size of the files: it is under 70 MiB with the default threads, and the same at 100 MB and at 1 GB (see
-[Memory](#memory) for the worst case). The 100 GB check itself is measured once, together with the sorter, on the
-sorter's own output.
+[Memory](#memory) for the worst case). The 100 GB check itself is measured once, on the output of the sorter's
+100 GB run in its next change.
 
 ### Threads
 
@@ -512,8 +513,10 @@ the checker.
   about reading is run against the checker's own splitting and parsing.
 - The checker is tested against two things that share no code with it and live in the test project: a naive
   parser, which carries the Number as a `BigInteger`, and a naive comparison and sort built on it.
-- **Correct pairs**: files made by the generator in memory, with lines added that the generator cannot write yet
-  (Numbers above 64 bits, Strings that end with a carriage return), sorted by the naive sort, must be `CORRECT`.
+- **Correct pairs**: files made by the generator in memory, plain and with every edge case (Numbers above 64 bits
+  and Strings that end with a carriage return among them), each with a few lines added by hand that the generator
+  writes rarely or never (a Number of 39 digits, a String that ends with a space), sorted by the naive sort, must be
+  `CORRECT`.
 - **The catalogue of breakages**: a correct pair is broken in one way at a time, each a kind of wrong output that
   a sorter can plausibly produce, and each must give its result: a line removed, written twice or replaced by a
   copy of another; a pair of identical lines replaced by another pair; neighbours swapped; Numbers ordered as
@@ -535,12 +538,12 @@ the checker.
 - **For large files with a fault in each**, which of the two faults is reported can depend on timing (see
   [How it works](#how-it-works)).
 - **Both files are required.** There is no mode that checks only the order or only the validity of one file.
-- **Sorter decisions that are still open** come back to the checker: the order of lines with equal keys and
-  different bytes (accepted in any order today), the policy for malformed input lines (any invalid line stops the
-  check today), and whether the output keeps the byte order mark of its input (the result does not depend on it
-  today).
-- **100 GB is not measured yet.** No sorted file of that size exists before the sorter; the figures above are for
-  1 GB read from the file cache.
+- **Lines with equal keys are accepted in any order**, although the sorter writes them in the order of their bytes:
+  the checker answers whether a file is sorted, and for the task both orders are; it counts such pairs in the
+  summary. The sorter's other decisions agree with the checker's: an invalid line stops either program at the first
+  such line, and the sorter writes no byte order mark, on which the result of a check does not depend.
+- **100 GB is not measured yet.** It is checked once, on the output of the sorter's 100 GB run in its next change;
+  the figures above are for 1 GB read from the file cache.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine.
 - **Trim analysis covers trimming only**, as for the generator: a check publish with `PublishTrimmed` reports no

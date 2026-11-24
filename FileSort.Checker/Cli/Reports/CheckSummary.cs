@@ -34,9 +34,11 @@ internal static class CheckSummary
                 + @"input does. The output seems to be written with the line ending \r\n, and the input with \n.");
         }
 
-        writer.WriteLine(string.Create(invariant, $"Equal keys, different bytes: {Count(result.Output.Order.EqualKeyPairs, "pair")}"));
+        string equalKeyPairs = Count(result.Output.Order.EqualKeyPairs, "pair");
+        writer.WriteLine(string.Create(invariant, $"Equal keys, different bytes: {equalKeyPairs}"));
         writer.WriteLine(string.Create(invariant, $"Elapsed:          {elapsed.TotalSeconds:F2} s"));
-        writer.WriteLine(string.Create(invariant, $"Throughput:       {files.TotalSize / Mebibyte / seconds:F0} MiB/s"));
+        double throughput = files.TotalSize / Mebibyte / seconds;
+        writer.WriteLine(string.Create(invariant, $"Throughput:       {throughput:F0} MiB/s"));
         writer.WriteLine(string.Create(invariant, $"Peak working set: {process.PeakWorkingSet64 / Mebibyte:F0} MiB"));
         writer.WriteLine($"Result:           {(result.Outcome == CheckOutcome.Correct ? "CORRECT" : "NOT CORRECT")}");
     }

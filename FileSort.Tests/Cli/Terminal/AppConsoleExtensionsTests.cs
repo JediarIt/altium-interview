@@ -19,7 +19,10 @@ public class AppConsoleExtensionsTests
     public void An_error_written_to_a_broken_stream_does_not_fail()
     {
         // A stream redirected to a file on a full disk fails like this.
-        FakeConsole console = new() { OnErrorWrite = _ => throw new IOException("There is not enough space on the disk.") };
+        FakeConsole console = new()
+        {
+            OnErrorWrite = _ => throw new IOException("There is not enough space on the disk."),
+        };
 
         console.TryWriteError("Cannot read the file.");
 

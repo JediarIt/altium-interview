@@ -10,15 +10,17 @@ namespace FileSort.Tests.Checker.Checks;
 
 /// <summary>
 /// An input file and its correctly sorted lines, made without any code of the checker: the generator writes the
-/// input, the tests add lines that the generator cannot write yet, and the naive sort orders them. A test takes the
-/// sorted lines, breaks them in one way and joins them into an output.
+/// input, the tests add lines that the generator writes rarely or not at all, and the naive sort orders them. A test
+/// takes the sorted lines, breaks them in one way and joins them into an output.
 /// </summary>
 internal sealed class SortedPair
 {
     /// <summary>
-    /// Lines that the generator does not write: Numbers above 64 bits, Numbers with many leading zeros, Strings
-    /// that end with a carriage return or a space, lines with equal keys and different bytes, and Strings whose
-    /// order differs between the right comparison and the wrong ones (letter case, UTF-16 code units).
+    /// Lines that every pair holds, whatever the generator drew: Numbers above 64 bits, Numbers with many leading
+    /// zeros, Strings that end with a carriage return or a space, lines with equal keys and different bytes, and
+    /// Strings whose order differs between the right comparison and the wrong ones (letter case, UTF-16 code
+    /// units). The generator writes some of them with its edge cases, at random; the Number of 39 digits and the
+    /// space at the end of a String it never writes.
     /// </summary>
     public static readonly string[] HandWrittenLines =
     [

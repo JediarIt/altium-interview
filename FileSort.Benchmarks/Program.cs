@@ -4,15 +4,16 @@ using BenchmarkDotNet.Running;
 
 using FileSort.Benchmarks.Experiments.Checker;
 using FileSort.Benchmarks.Experiments.Generator;
+using FileSort.Benchmarks.Experiments.Sorter;
 using FileSort.Benchmarks.Micro.Generator;
 
 // The command line is built on System.CommandLine, like the generator's: one way to declare options, to validate
 // them and to print help in every program of the solution.
 Command micro = new(
     "micro",
-    "BenchmarkDotNet: the hot paths of the generator and of the checker and, without a disk, the generator's "
-    + "pipeline and the checker's scans. Everything after the command goes to BenchmarkDotNet: `micro --filter *`, "
-    + "`micro --filter *Scan*`, `micro --list flat`.")
+    "BenchmarkDotNet: the hot paths of the generator, the checker and the sorter and, without a disk, the generator's "
+    + "pipeline, the checker's scans and the sorter's sort of a chunk. Everything after the command goes to "
+    + "BenchmarkDotNet: `micro --filter *`, `micro --filter *Scan*`, `micro --list flat`.")
 {
     TreatUnmatchedTokensAsErrors = false,
 };
@@ -31,6 +32,9 @@ RootCommand root = new(
     PipelineExperiment.CreateCommand(),
     SortedCopyExperiment.CreateCommand(),
     CheckExperiment.CreateCommand(),
+    BlockMergeExperiment.CreateCommand(),
+    SortPhasesExperiment.CreateCommand(),
+    ProgressCostExperiment.CreateCommand(),
 };
 
 try

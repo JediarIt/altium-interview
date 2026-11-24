@@ -16,7 +16,8 @@ namespace FileSort.Tests.Checker.Checks.Scans;
 /// </summary>
 public class ChunksAndThreadsTests
 {
-    private static readonly Lazy<SortedPair> Pair = new(() => SortedPair.Generated(EdgeCases.All, CommonLineEnding.Lf, seed: 13));
+    private static readonly Lazy<SortedPair> Pair =
+        new(() => SortedPair.Generated(EdgeCases.All, CommonLineEnding.Lf, seed: 13));
 
     // From chunks of a few lines, which put thousands of pairs of neighbours across two chunks, to one chunk for
     // the whole file; from one thread to more threads than the machine may have.
@@ -25,7 +26,8 @@ public class ChunksAndThreadsTests
         { 64, 1 }, { 64, 4 }, { 100, 2 }, { 1000, 3 }, { 4096, 1 }, { 4096, 8 }, { 65536, 32 }, { 4 * 1024 * 1024, 1 },
     };
 
-    private static (CheckResult Result, List<OrderViolation> Reported) Check(byte[] input, byte[] output, int chunkSize, int threads)
+    private static (CheckResult Result, List<OrderViolation> Reported) Check(
+        byte[] input, byte[] output, int chunkSize, int threads)
     {
         ScanFeed feed = new();
         CheckResult result = TestCheck.Run(
@@ -89,7 +91,8 @@ public class ChunksAndThreadsTests
 
     [Theory]
     [MemberData(nameof(Settings))]
-    public void The_violations_of_an_unsorted_file_are_counted_and_numbered_however_it_is_cut(int chunkSize, int threads)
+    public void The_violations_of_an_unsorted_file_are_counted_and_numbered_however_it_is_cut(
+        int chunkSize, int threads)
     {
         // The input as its own output: the same lines, tens of thousands of them out of order.
         SortedPair pair = Pair.Value;
@@ -124,7 +127,8 @@ public class ChunksAndThreadsTests
         List<NaiveLine> lines = [.. pair.Lines];
         foreach (int at in new[] { 100, lines.Count / 2, lines.Count - 100 })
         {
-            int swap = Enumerable.Range(at, 50).First(i => NaiveLineComparer.Instance.Compare(lines[i], lines[i + 1]) < 0);
+            int swap = Enumerable.Range(at, 50)
+                .First(i => NaiveLineComparer.Instance.Compare(lines[i], lines[i + 1]) < 0);
             (lines[swap], lines[swap + 1]) = (lines[swap + 1], lines[swap]);
         }
 
@@ -181,7 +185,8 @@ public class ChunksAndThreadsTests
 
         Assert.Equal(CheckOutcome.NotChecked, result.Outcome);
         Assert.Equal(ScanEnd.Failed, result.Output.End);
-        Assert.Contains($"line {at + 1}, which starts at byte {offset}, is longer than {longest} bytes", result.Output.Failure);
+        string expected = $"line {at + 1}, which starts at byte {offset}, is longer than {longest} bytes";
+        Assert.Contains(expected, result.Output.Failure);
     }
 
     [Theory]

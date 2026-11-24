@@ -193,7 +193,8 @@ public sealed class CheckerReportTests : IDisposable
 
     [Theory]
     [InlineData("1. Apple\n415. Apple\n415. Apple\n32. Cherry is the best\n30432. Something something something\n")]
-    [InlineData("1. Apple\n415. Apple\n2. Banana is yellow\n32. Cherri is the best\n30432. Something something something\n")]
+    [InlineData("1. Apple\n415. Apple\n2. Banana is yellow\n32. Cherri is the best\n"
+        + "30432. Something something something\n")]
     public void The_same_number_of_lines_and_different_lines(string sorted)
     {
         int exitCode = _run.Check(Input, sorted);
@@ -368,9 +369,15 @@ public sealed class CheckerReportTests : IDisposable
         Assert.Equal(3, _run.OutLines.Count(line => line.StartsWith("Order violation", StringComparison.Ordinal)));
         Assert.All(
             [
-                "Order violation at output line 2: equal Strings, Numbers out of order", "  1: 5. Apple", "  2: 4. Apple",
-                "Order violation at output line 4: equal Strings, Numbers out of order", "  3: 9. Banana", "  4: 1. Banana",
-                "Order violation at output line 6: equal Strings, Numbers out of order", "  5: 3. Cherry", "  6: 2. Cherry",
+                "Order violation at output line 2: equal Strings, Numbers out of order",
+                "  1: 5. Apple",
+                "  2: 4. Apple",
+                "Order violation at output line 4: equal Strings, Numbers out of order",
+                "  3: 9. Banana",
+                "  4: 1. Banana",
+                "Order violation at output line 6: equal Strings, Numbers out of order",
+                "  5: 3. Cherry",
+                "  6: 2. Cherry",
             ],
             line => Assert.Contains(line, _run.OutLines));
         Assert.Equal("FAILED, 3 violations, the first at line 2", _run.Field("Order"));
@@ -452,11 +459,13 @@ public sealed class CheckerReportTests : IDisposable
         Assert.Equal(_run.SortedPath, _run.SettingsField("Checking"));
         Assert.Equal(_run.InputPath, _run.SettingsField("Against input"));
         Assert.Equal("auto", _run.SettingsField("Line ending"));
-        Assert.Equal(ScanSettings.DefaultThreads.ToString(System.Globalization.CultureInfo.InvariantCulture), _run.SettingsField("Threads"));
+        string threads = ScanSettings.DefaultThreads.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(threads, _run.SettingsField("Threads"));
 
         // The settings go to the error stream, before the progress.
-        Assert.True(
-            _run.Error.IndexOf("Threads:", StringComparison.Ordinal) < _run.Error.IndexOf(" left", StringComparison.Ordinal));
+        int settingsEnd = _run.Error.IndexOf("Threads:", StringComparison.Ordinal);
+        int firstProgress = _run.Error.IndexOf(" left", StringComparison.Ordinal);
+        Assert.True(settingsEnd < firstProgress);
         Assert.DoesNotContain("Checking:", _run.Out);
     }
 
@@ -467,7 +476,8 @@ public sealed class CheckerReportTests : IDisposable
         File.WriteAllText(_run.SortedPath, "1. Apple\r\n2. Banana\r\n");
         string relative = Path.GetRelativePath(Environment.CurrentDirectory, _run.InputPath);
 
-        int exitCode = _run.Run("--input", relative, "--sorted", _run.SortedPath, "--line-ending", "crlf", "--threads", "3");
+        int exitCode = _run.Run(
+            "--input", relative, "--sorted", _run.SortedPath, "--line-ending", "crlf", "--threads", "3");
 
         Assert.Equal(ExitCode.Success, exitCode);
         Assert.Equal("3", _run.SettingsField("Threads"));
@@ -541,8 +551,8 @@ public sealed class CheckerReportTests : IDisposable
     private string[] ReportWithThreads(byte[] file, string threads)
     {
         _run.Console = new FakeConsole();
-        int exitCode = _run.Check(
-            file, file, new ScanSettings { ChunkSize = 4096 }, TestContext.Current.CancellationToken, "--threads", threads);
+        ScanSettings small = new() { ChunkSize = 4096 };
+        int exitCode = _run.Check(file, file, small, TestContext.Current.CancellationToken, "--threads", threads);
 
         Assert.Equal(ExitCode.NotCorrect, exitCode);
         return [.. _run.OutLines.Where(line => !line.StartsWith("Elapsed", StringComparison.Ordinal)
@@ -569,7 +579,9 @@ public sealed class CheckerReportTests : IDisposable
     {
         string tooLong = "2. " + new string('x', 30) + "\n";
 
-        int exitCode = _run.Check("1. Apple\n" + tooLong, "1. Apple\nBanana\n", new ScanSettings { MaxLineLength = 20 }, TestContext.Current.CancellationToken);
+        ScanSettings scan = new() { MaxLineLength = 20 };
+        int exitCode = _run.Check(
+            "1. Apple\n" + tooLong, "1. Apple\nBanana\n", scan, TestContext.Current.CancellationToken);
 
         // The invalid line goes to standard output with its result, the line above the limit to the error stream,
         // and the exit code agrees with the printed result.
@@ -584,7 +596,9 @@ public sealed class CheckerReportTests : IDisposable
     {
         string tooLong = "2. " + new string('x', 30) + "\n";
 
-        int exitCode = _run.Check("1. Apple\n" + tooLong, "1. Apple\n" + tooLong, new ScanSettings { MaxLineLength = 20 }, TestContext.Current.CancellationToken);
+        ScanSettings scan = new() { MaxLineLength = 20 };
+        int exitCode = _run.Check(
+            "1. Apple\n" + tooLong, "1. Apple\n" + tooLong, scan, TestContext.Current.CancellationToken);
 
         Assert.Equal(ExitCode.Failure, exitCode);
         Assert.Contains($"Cannot check '{_run.InputPath}'", _run.Error);
@@ -658,9 +672,8 @@ public sealed class CheckerReportTests : IDisposable
         // The exit code still carries the verdict, and the error stream says, once, that the report was lost.
         Assert.Equal(expected, exitCode);
         Assert.Empty(_run.Out);
-        Assert.Single(
-            _run.Error.Split('\n'),
-            line => line.Contains("its report could not be printed: There is not enough space on the disk.", StringComparison.Ordinal));
+        const string Lost = "its report could not be printed: There is not enough space on the disk.";
+        Assert.Single(_run.Error.Split('\n'), line => line.Contains(Lost, StringComparison.Ordinal));
     }
 
     [Fact]

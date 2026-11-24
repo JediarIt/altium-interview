@@ -17,8 +17,9 @@ public static class LineFormat
     public const ulong MaxNumber = ulong.MaxValue;
 
     /// <summary>
-    /// The count of digits of <see cref="MaxNumber"/>. The generator writes no Number with more digits, leading
-    /// zeros included. A longer Number is still valid, and its value may or may not fit in 64 bits.
+    /// The count of digits of <see cref="MaxNumber"/>: a Number of up to 19 digits always fits in 64 bits, one of 20
+    /// digits fits unless it passes <see cref="MaxNumber"/>. It is not a limit of the format: a longer Number is
+    /// valid, and its value may or may not fit in 64 bits, depending on its leading zeros.
     /// </summary>
     public const int MaxNumberDigits = 20;
 

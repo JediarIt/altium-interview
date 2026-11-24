@@ -3,8 +3,8 @@
 External sorting of very large text files (~100 GB and more) in C# / .NET 10, plus a test file generator and an
 independent checker.
 
-> **Status: work in progress.** The generator and the checker are implemented and measured; the sorter comes next.
-> Sections marked *TBD* get filled in as each part is implemented and measured.
+> **Status: work in progress.** The generator, the checker and the sorter are implemented and measured: the sorter
+> sorts 1 GB in 12 s within 1 GB of memory. The next change tunes it on measurements and runs the 100 GB file.
 
 ## Contents
 
@@ -26,22 +26,25 @@ Needs the [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0) or 
 space. In PowerShell, from the root of the repository:
 
 ```powershell
-# 1. Build the generator and the checker as executables in publish/
+# 1. Build the generator and the checker as executables in publish/, and the sorter in publish/sorter/
 dotnet publish FileSort.Generator -c Release -r win-x64 -o publish
 dotnet publish FileSort.Checker -c Release -r win-x64 -o publish
+dotnet publish FileSort.Sorter -c Release -o publish/sorter
 
 # 2. Generate a 1 GB test file
 publish/FileSort.Generator.exe --output data/test.txt --size 1GB
 
-# 3. Sort it. Until the sorter exists, this makes a sorted copy in memory (files of up to 2 GB)
-dotnet run -c Release --project FileSort.Benchmarks -- sorted-copy --input data/test.txt --output data/sorted.txt
+# 3. Sort it
+publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.txt
 
 # 4. Check the result: CORRECT and exit code 0 mean that the sorted file is right
 publish/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
 ```
 
-The executables run without .NET, so they can be copied to another machine. Every program lists its options with
-`--help`. Other platforms, tests and running from source: [Build and run from source](#build-and-run-from-source).
+The generator and the checker run without .NET, so they can be copied to another machine. The sorter needs the
+.NET 10 runtime: it comes with the .NET 10 SDK, and with a newer SDK it is a separate install. Every program lists
+its options with `--help`. Other platforms, tests and running from source:
+[Build and run from source](#build-and-run-from-source).
 
 ## The problem
 
@@ -103,7 +106,14 @@ dotnet run -c Release --project FileSort.Generator -- --output data/test-1gb.txt
 The run prints the seed and the command line that writes the same file again. The `data/` directory is ignored by
 git.
 
-Sort the file: *TBD, the sorter is not implemented yet.*
+Sort it (the options are in the [sorter's README](FileSort.Sorter/README.md#options)):
+
+```powershell
+dotnet run -c Release --project FileSort.Sorter -- --input data/test-1gb.txt --output data/sorted-1gb.txt
+```
+
+The exit code is 0 when the output is written and 3 when the input is not valid; the summary on standard output
+says what was done.
 
 Check that a sorted file is the sorted version of its input (the options are in the
 [checker's README](FileSort.Checker/README.md#options)):
@@ -113,14 +123,13 @@ dotnet run -c Release --project FileSort.Checker -- --input data/test-1gb.txt --
 ```
 
 The exit code is 0 when the sorted file is correct, 4 when it is not and 3 when a file is not valid; the report
-says what was found. Until the sorter exists, a sorted file for trying the checker out can be made with
-`dotnet run -c Release --project FileSort.Benchmarks -- sorted-copy --input data/test-1gb.txt --output data/sorted-1gb.txt`
-(an in-memory sort for files of up to 2 GB).
+says what was found.
 
 The generator and the checker can also be published as single executables that run on a machine without .NET
 installed (for example a QA machine), as in the [Quick start](#quick-start). For other platforms, use `linux-x64`,
-`osx-arm64` and so on in place of `win-x64`; any machine with the .NET SDK can publish for any of them. The
-published programs take the same options as `dotnet run`.
+`osx-arm64` and so on in place of `win-x64`; any machine with the .NET SDK can publish for any of them. The sorter
+is published for the .NET runtime, `dotnet publish FileSort.Sorter -c Release -o publish/sorter`, and runs wherever
+the .NET 10 runtime is installed. The published programs take the same options as `dotnet run`.
 
 Disk space: sorting a file needs roughly 3x its size free (input, temporary runs and output). For the 100 GB
 scenario, plan for about 300 GB.
@@ -130,9 +139,10 @@ scenario, plan for about 300 GB.
 | Path | Purpose |
 |---|---|
 | `FileSort.Common/` | Class library: the line format shared by Generator and Sorter (format constants and the line ending) |
-| `FileSort.Cli/` | Class library: the console plumbing shared by the programs (exit codes, the console abstraction, the progress line, Ctrl+C, command-line errors) |
+| `FileSort.Cli/` | Class library: the console plumbing shared by the programs (exit codes, the console abstraction, the progress line, Ctrl+C, command-line errors, the parsers of sizes and whole numbers, the question before an existing output is replaced) |
 | `FileSort.Generator/` | Console app: test file generator; its [README](FileSort.Generator/README.md) has the options, the measurements and the design decisions |
-| `FileSort.Sorter/` | Console app: the external sorter |
+| `FileSort.Engine/` | Class library: the sorting engine, with no console code; the sorter's [README](FileSort.Sorter/README.md#how-it-works) describes how it works |
+| `FileSort.Sorter/` | Console app: the external sorter, a thin host over the engine; its [README](FileSort.Sorter/README.md) has the options, what the output holds, the measurements and the design decisions |
 | `FileSort.Checker/` | Console app: verifies a sorted output against its input; its [README](FileSort.Checker/README.md) has the options, what is checked, the measurements and the design decisions |
 | `FileSort.Tests/` | Unit and integration tests |
 | `FileSort.Benchmarks/` | Console app: BenchmarkDotNet micro-benchmarks and the experiments behind the numbers in [Performance](#performance) |
@@ -143,27 +153,28 @@ scenario, plan for about 300 GB.
 | `Directory.Packages.props` | Central package versions |
 | `nuget.config` | Restores from nuget.org only, so the build does not depend on machine-level feeds |
 | `global.json` | Requires a .NET SDK 10.0.100 or newer (release versions only); runs tests on Microsoft.Testing.Platform |
-| `.github/` | GitHub Actions: build and tests with coverage, a workflow per program, and publishing the generator or the checker by hand, see [Development process](#development-process) |
+| `.github/` | GitHub Actions: build and tests with coverage, a workflow per program, and publishing the generator or the checker by hand, see [Continuous integration](#continuous-integration) |
 
 `FileSort.Checker` intentionally does not reference `FileSort.Common`. It parses and compares lines with its own
 deliberately simple code, so a bug in the optimized sorting code cannot be confirmed by that same code.
 
 ## Assumptions
 
-The task leaves several details open. The table shows how each one is resolved; items marked *TBD* are decided
-together with the implementation. The line format and the order of lines are specified, with acceptance scenarios,
-in [openspec/specs/line-format](openspec/specs/line-format/spec.md) and
-[openspec/specs/sort-order](openspec/specs/sort-order/spec.md).
+The task leaves several details open. The table shows how each one is resolved. The line format and the order of
+lines are specified, with acceptance scenarios, in [openspec/specs/line-format](openspec/specs/line-format/spec.md)
+and [openspec/specs/sort-order](openspec/specs/sort-order/spec.md); what the sorter does with them, in
+[openspec/specs/external-sorter](openspec/specs/external-sorter/spec.md).
 
 | Topic | Decision |
 |---|---|
 | String comparison | Ordinal, byte by byte over UTF-8, which equals Unicode code point order. Case-sensitive: `Banana` sorts before `apple`. |
 | Number comparison | Numeric, not textual: `2` comes before `10`. A Number is one or more decimal digits; neither the count of digits nor the value is limited, so `18446744073709551616` (one above the 64-bit range) is a valid Number. Leading zeros are valid and do not change the value: `007` is 7. No sign, no spaces. The Number takes part only when the Strings are equal. |
 | Separator | The first `". "` in a line. The String part may itself contain `". "`. |
-| Duplicate lines | Kept: the output has every line of the input, byte for byte, as many times as the input has it. Lines with equal keys are either identical or differ only in the leading zeros of their Numbers: `007. Apple` and `7. Apple`. A file counts as sorted whichever of such lines comes first; the order that the sorter gives them is decided together with the sorter. |
+| Duplicate lines | Kept: the output has every line of the input, byte for byte, as many times as the input has it. Lines with equal keys are either identical or differ only in the leading zeros of their Numbers: `007. Apple` and `7. Apple`. The sorter writes such lines in the order of their bytes, `0. Apple`, `00. Apple`, `007. Apple`, `07. Apple`, `7. Apple`, so its output depends only on its input; the checker accepts them in any order. |
 | Line endings | A file has one line ending for all its lines, `\n` or `\r\n`, and the program that reads it works with that one. The last line may lack it. A carriage return that is not part of the line ending is an ordinary byte of the String, also at its end. The sorter's output has the line ending of its input: the checker reads both files with one line ending, taken from the input unless it is given. |
 | Encoding | UTF-8; a String is well-formed UTF-8 without a line feed. A file may start with a byte order mark (BOM), which is not part of the first line. None is written. |
-| Malformed lines | The checker stops at the first line that is not valid, in either file, and names the file, the line number and the reason. What the sorter does with a malformed input: *TBD*, decided together with the sorter. |
+| Malformed lines | Rejected, never skipped. The sorter stops at the first line that is not valid, in the order of the file, names the line number, its offset and the reason, writes no output and ends with exit code 3. The checker stops the same way at the first such line in either file. |
+| Line length | Limits of the tools, not of the format. The sorter accepts lines of up to 1 MiB, their terminator not counted, which keeps its memory bounded for every input it accepts; a longer line ends the sort with exit code 1. The checker accepts up to 64 MiB. A longer "line" usually means a file read with the wrong line ending. |
 | Empty String part | Valid: `5. ` followed by the line ending is a line with an empty String. |
 
 Why ordinal comparison: it is deterministic and identical on every machine and OS, it does not depend on culture
@@ -189,7 +200,8 @@ FileSort.Generator --output data/test.txt --size 1GB --seed 42
 - **Made for testing a sorter.** Strings of dictionary words with a configurable share of repeated Strings, Numbers
   of every length, fully identical lines.
 - **Edge cases on request** (`--edge-cases`): text outside ASCII, the separator inside a String, letter case,
-  Numbers that do not fit in 32 or 63 bits, leading zeros, empty Strings.
+  Numbers that do not fit in 32, 63 or 64 bits, leading zeros, empty Strings, Strings that end with a carriage
+  return.
 - **Careful with files.** The output path never holds a partial file, and an existing file is replaced only with
   consent.
 - **Fast and small.** 100 GB in about a minute with under 100 MiB of memory (see [Performance](#performance)).
@@ -199,13 +211,28 @@ generator are in [FileSort.Generator/README.md](FileSort.Generator/README.md).
 
 ### Sorter
 
-*TBD.* The approach is an external merge sort: split the input into chunks that fit the memory budget, sort each
-chunk in memory and write it to a temporary file (a "run"), then merge the runs into the output. Details such as the
-in-memory line representation, parallelism, buffer sizes and the merge strategy follow from measurements and will be
-described here.
+An external merge sort in two phases, within the memory given in `--memory`:
 
-The sorting engine is a class library, and the console app is a thin host around it. This keeps the algorithm
-testable in-process and usable outside the command line.
+```powershell
+FileSort.Sorter --input data/test.txt --output data/sorted.txt
+```
+
+- **Chunks.** The input is read in chunks as large as the memory allows. The lines of a chunk are parsed and checked
+  on all threads into an index of 16-byte entries that carry the first 8 bytes of the String, so most comparisons
+  never read a line; the index is sorted on all threads, and the sorted parts are merged into one run on all threads
+  by ranges of keys. An input that fits in one chunk is written straight to the output.
+- **Merge.** The runs, kept in a temporary folder of the sort's own, are merged into the output with a loser tree.
+  One merge takes about 430 runs at the default memory, about 220 GB of input; more runs are first merged in groups.
+- **Correct by construction and by test.** The output has every line of the input with its bytes, in the order of
+  String, then Number of any length, then the bytes of the line, so it does not depend on the threads or the
+  memory. An invalid line stops the sort before anything is written.
+- **Careful with files.** The output path never holds a partial file, an existing output is replaced only with
+  consent, free space is checked before reading, and the temporary folder is deleted however the sort ends.
+- **Thin host.** The engine, `FileSort.Engine`, is a class library without console code; `FileSort.Sorter` reads the
+  command line, draws the progress with Spectre.Console and prints the summary.
+
+The options, what the output holds, the handling of invalid input, temporary files and memory, how it works, the
+measurements and the design decisions of the sorter are in [FileSort.Sorter/README.md](FileSort.Sorter/README.md).
 
 ### Checker
 
@@ -232,12 +259,17 @@ FileSort.Checker --input data/test.txt --sorted data/sorted.txt
 
 The options, what exactly is checked, the report, the measurements and the design decisions of the checker are in
 [FileSort.Checker/README.md](FileSort.Checker/README.md). A static HTML report built from the sorter's logs, with
-time per phase, throughput and memory, is a later piece of work, after the sorter.
+time per phase, throughput and memory, is a later piece of work.
 
 ## Verifying correctness
 
-*TBD for the sorter.* Automated tests compare the sorter against a naive in-memory sort on generated files, with a
-tiny memory budget that forces many temporary runs. The Checker covers the large files.
+The sorter is tested against two oracles that share no code with it: a naive parser and sort in the test project,
+and the checker, run in-process. Generated inputs with every edge case are sorted with 1 to 16 threads and with
+chunk buffers from the smallest, which makes many runs and several merge passes, to one that holds the whole
+input; the output must equal the naive sort byte for byte. The many-run cases keep their runs in memory, so the
+tests write megabytes. Twelve faults put into the engine one at a time, among them a comparison of signed prefixes,
+a block bound off by one and a run's last line dropped, each made tests fail. The tests are described in
+[its README](FileSort.Sorter/README.md#tests); the checker covers the large files.
 
 The checker is the tool that verifies the sorter, so it is verified itself, against code that shares nothing with
 it: a naive parser, comparison and sort that live in the test project. Its tests include a catalogue of the ways a
@@ -257,20 +289,23 @@ dotnet test --solution FileSort.slnx -c Release --coverage --coverage-output-for
 | Assembly | Lines | Branches |
 |---|---|---|
 | `FileSort.Common` | 100% | 100% |
-| `FileSort.Cli` | 89.7% | 100% |
-| `FileSort.Generator` | 98.3% | 91.8% |
-| `FileSort.Checker` | 98.5% | 96.8% |
-| All | 97.9% (1802 of 1841) | 94.6% (669 of 707) |
+| `FileSort.Cli` | 92.3% | 91.7% |
+| `FileSort.Generator` | 98.5% | 93.4% |
+| `FileSort.Checker` | 98.9% | 96.7% |
+| `FileSort.Engine` | 96.9% | 88.6% |
+| `FileSort.Sorter` | 98.6% | 87.5% |
+| All | 97.7% (3266 of 3342) | 92.0% (1120 of 1217) |
 
 The table of a run, and the 80% check, come from `./.github/scripts/coverage-summary.ps1 -Report
 TestResults/coverage.cobertura.xml`. CI applies the check to the assemblies of one program at a time: the
-generator with the two shared libraries, the checker with `FileSort.Cli`.
+generator with the two shared libraries, the checker with `FileSort.Cli`, the sorter with the engine and
+`FileSort.Cli`.
 
-Four classes are under 80%, on purpose. They are the thin layer between a program and the process it runs in,
-and tests run the programs in-process, through `GeneratorApp` and `CheckerApp`, with a console of their own,
-which covers everything behind that layer:
+Five classes are under 80%, on purpose. They are the thin layer between a program and the process it runs in,
+and tests run the programs in-process, through `GeneratorApp`, `CheckerApp` and `SorterApp`, with a console of
+their own, which covers everything behind that layer:
 
-- `Program` of the generator and of the checker (0%): one line each, the entry point.
+- `Program` of the generator, of the checker and of the sorter (0%): one line each, the entry point.
 - `SystemConsole` (0%): a pass-through to `System.Console`.
 - `CancellationSignals` (64.7%): the handlers of Ctrl+C and of the termination signals run only when a signal
   arrives; a test cannot send one to its own process without ending the test run.
@@ -278,7 +313,9 @@ which covers everything behind that layer:
 These are checked on the published executables instead: the generator writes the pinned reference file, the
 checker gives the exit codes 0 and 4 for a correct and a broken pair, and a real Ctrl+C console event, sent by a
 script, ends each of them with exit code 130: the generator with no file left, the checker with the cancellation
-reported and no result. `FileSort.Sorter` is still a placeholder and is not in the report.
+reported and no result, the sorter during its merge with neither the output nor its temporary files left; the
+outputs of the published sorter are checked by the checker. The progress bars of the sorter are drawn in the tests
+on a console of the tests that Spectre.Console takes for a terminal.
 
 ## Performance
 
@@ -317,13 +354,14 @@ How the numbers were taken, and how far they can be trusted:
 
 ### Sorter
 
-*TBD.*
+The published build with default options sorts a 1 GB file in 11.9 s, on all 16 logical processors, with a peak
+working set of 932 MiB (one run: the margin is five times, and a run writes 2 GB). The requirements are under a
+minute and about 2 GB at the same time. With the smallest `--memory`, 256 MB, the peak stays at 160 to 161 MiB, also
+with 64 threads on two processors; the reserve that the sorter keeps for the runtime is about four times what it needs.
+100 GB is measured once, in the next change.
 
-| Input size | Wall time | Peak memory |
-|---|---|---|
-| 1 GB | *TBD* | *TBD* |
-| 10 GB | *TBD* | *TBD* |
-| 100 GB | *TBD* | *TBD* |
+The tables, the memory, the edge cases, the cancellation, the cost of the progress bars and the measurements that
+chose the parts of the engine are in the [sorter's README](FileSort.Sorter/README.md#performance).
 
 ### Checker
 
@@ -355,12 +393,24 @@ Notable decisions and their reasons, recorded as they are made.
   or the Generator, so that it can catch their bugs instead of repeating them. What it does share is the console
   plumbing of `FileSort.Cli`, which has no line code.
 - **Exit codes mean the same in every program.** 0 is success, 1 a failure to do the work, 2 invalid arguments,
-  130 a cancellation; the checker adds 3 for a file that is not valid and 4 for an output that is not correct. Code 4
-  is not code 1 because the most useful thing a script can learn from a checker is the difference between "checked,
-  and it is wrong" and "could not check". The codes are defined once, in `FileSort.Cli`.
-- **Reports instead of a UI.** Visual analysis is planned as a static HTML report built from the Sorter's logs,
-  after the sorter exists. A dedicated UI application would add another technology stack and a lot of code without
+  130 a cancellation; 3 is a file that is not valid, for the checker and for the sorter alike, and the checker adds 4
+  for an output that is not correct. Code 4 is not code 1 because the most useful thing a script can learn from a
+  checker is the difference between "checked, and it is wrong" and "could not check". The codes are defined once, in
+  `FileSort.Cli`.
+- **Reports instead of a UI.** Visual analysis is planned as a static HTML report built from the Sorter's logs, as
+  a later piece of work. A dedicated UI application would add another technology stack and a lot of code without
   making the sorter any better.
+- **Progress bars in the sorter only.** A sort of a large file runs for minutes, in phases and merge passes, so the
+  sorter draws its progress with Spectre.Console, the author's choice over RazorConsole, which needs a hosting stack
+  for nothing the sorter uses. The package is referenced by `FileSort.Sorter` alone: the engine never sees it, and
+  the generator and the checker, trimmed into single files, keep the one progress line of `FileSort.Cli`.
+- **The sorting engine is a library without console code**, `FileSort.Engine`, and `FileSort.Sorter` is a thin host
+  over it: the algorithm runs in-process in tests and experiments, with its runs in memory when a test wants
+  thousands of them. A test fails if the engine's assembly references console code. `--memory` limits the whole
+  process, not only the engine's buffers: the host keeps a reserve for the runtime and gives the engine the rest.
+- **Decisions about the sorter** (one buffer for lines and their index, a 16-byte entry, the framework's sort, the
+  merge of a chunk by ranges of keys, the loser tree, the order of equal keys, the line limit) are in
+  [its README](FileSort.Sorter/README.md#design-decisions).
 - **Decisions about the checker** (digits instead of converted Numbers, a sum of 128-bit hashes, one line ending
   for the pair, why it checks in parallel) are in [its README](FileSort.Checker/README.md#design-decisions).
 - **Standalone generator and checker.** Test data is usually produced, and results checked, by QA engineers whose
@@ -383,13 +433,14 @@ Notable decisions and their reasons, recorded as they are made.
   [its README](FileSort.Generator/README.md#design-decisions).
 - **`FileSort.Common` holds only what two programs really share.** Today that is the constants of the line format
   and the line ending. The code that writes a line lives in the generator: the generator is the only program that
-  composes lines, while the sorter copies them as bytes. The line parser is not there yet either: it is the
-  sorter's hottest code and its shape depends on the sorter's design, so it is written and measured together with
-  the sorter. Until then the tests validate generated files with their own naive parser, which shares no code with
-  the writer: a writer and a parser built on one misunderstanding would agree with each other.
+  composes lines, while the sorter copies them as bytes. The line parser lives in the engine: it is the sorter's
+  hottest code, written for its index entry, and the sorter is the only program that uses it (the checker has its
+  own on purpose). The tests validate generated files with their own naive parser, which shares no code with the
+  writer or the engine: a writer and a parser built on one misunderstanding would agree with each other.
 - **The console code is a library of its own, `FileSort.Cli`, not a part of `FileSort.Common`.** The programs
   share what a console program needs: the exit codes, a console that tests can replace, the progress line, Ctrl+C
-  and the termination signals as one cancellation token, command-line errors that name their option. Putting these
+  and the termination signals as one cancellation token, command-line errors that name their option, the parsers of
+  sizes and of whole numbers, and the question before an existing output is replaced. Putting these
   classes into `FileSort.Common` would save a project and break two rules that project references enforce today.
   The checker cannot call the shared line code, because it has no reference to `FileSort.Common`; with the console
   classes there it would get that reference, and its independence would become a promise. And the sorting engine
@@ -418,13 +469,16 @@ changes keep the history of design decisions. `CLAUDE.md` contains the working r
 
 GitHub Actions workflows live in `.github/workflows/`:
 
-- **Generator** (`generator.yml`) and **Checker** (`checker.yml`) each build the solution and run the tests of one
-  program with code coverage, on every push to `main` and on every pull request that can affect that program. The
-  generator's workflow starts on changes of the generator, of the shared libraries, of the tests and of the build
-  files; the checker's on changes of the checker and on the same shared parts, and also on changes of the
-  generator, because the tests of the checker make their inputs with it. A commit that touches only the checker
-  does not run the generator's tests, and a commit that touches only documentation or `openspec/` starts nothing.
-- **Test a program** (`test-program.yml`) holds the steps once; the two workflows call it with the namespaces of
+- **Generator** (`generator.yml`), **Checker** (`checker.yml`) and **Sorter** (`sorter.yml`) each build the
+  solution and run the tests of one program with code coverage, on every push to `main` and on every pull request
+  that can affect that program. The generator's workflow starts on changes of the generator, of the shared
+  libraries, of the tests and of the build files; the checker's on changes of the checker and on the same shared
+  parts, and also on changes of the generator, because the tests of the checker make their inputs with it; the
+  sorter's on changes of the sorter, of its engine and of the same shared parts, and also of the generator and the
+  checker, because its tests make inputs with the one and check outputs with the other. A commit that touches only
+  the tests of one program starts only that program's workflow, and a commit that touches only documentation or
+  `openspec/` starts nothing.
+- **Test a program** (`test-program.yml`) holds the steps once; the three workflows call it with the namespaces of
   the tests to run and the assemblies whose coverage counts. It builds the whole solution (warnings are errors in
   every project), runs the tests, and shows the test results and the coverage table on the page of the run; the
   run fails when the line coverage of the program's assemblies, taken together, is below 80%. Compiler messages
@@ -435,14 +489,15 @@ GitHub Actions workflows live in `.github/workflows/`:
   attaches it to the run. For `win-x64` it also runs the executable: the generator must write the same bytes as
   the regular build, and the checker must give exit code 0 for a correct pair and 4 for a broken one.
 
-The workflows run on Windows. The sorter gets a third workflow of the same shape, where the split will matter
-most: its tests will be the slow ones.
+The workflows run on Windows. The sorter is not published by `publish.yml`: it runs on the .NET runtime, and its
+build is the one that `dotnet publish` makes anywhere.
 
 ## Limitations and next steps
 
-- The sorter is not implemented yet; the generator and the checker are the first two of the three programs.
-- The checker has not checked 100 GB yet: no sorted file of that size exists before the sorter. It is measured on
-  1 GB, and at 100 GB once, together with the sorter.
-- The HTML report of a sort is a later piece of work, after the sorter.
-- The limitations of the generator and of the checker are in their READMEs:
-  [generator](FileSort.Generator/README.md#limitations), [checker](FileSort.Checker/README.md#limitations).
+- The sorter is correct and within its memory budget, and not yet tuned: it merges its runs on one thread, and it
+  reads, sorts and writes in turns. The next change overlaps them, merges in parallel, measures the choices that
+  remain (unbuffered I/O, the garbage collector's mode, .NET 11) and sorts the 100 GB file once.
+- The checker has not checked 100 GB yet; it does so on the sorter's output of the 100 GB run.
+- The HTML report of a sort is a later piece of work.
+- The limitations of each program are in its README: [generator](FileSort.Generator/README.md#limitations),
+  [checker](FileSort.Checker/README.md#limitations), [sorter](FileSort.Sorter/README.md#limitations).

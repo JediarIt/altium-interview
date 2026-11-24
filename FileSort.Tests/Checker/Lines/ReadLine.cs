@@ -4,7 +4,8 @@ using FileSort.Checker.Lines;
 
 namespace FileSort.Tests.Checker.Lines;
 
-/// <summary>One line as the reader gave it, with what the reader says about it and what the parser makes of it.</summary>
+/// <summary>One line as the reader gave it, with what the reader says about it and what the parser makes of
+/// it.</summary>
 internal sealed record ReadLine(LineRead Read, byte[] Bytes, long Number, long Offset, bool HasTerminator)
 {
     public string Text => Encoding.UTF8.GetString(Bytes);

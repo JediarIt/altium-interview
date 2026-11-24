@@ -38,7 +38,9 @@ internal static class OutputSpace
         {
             // On Windows a volume is asked by its root. Elsewhere the root is always "/", which says nothing about
             // the file system mounted at the output, so the nearest directory that exists is asked instead.
-            string? volume = OperatingSystem.IsWindows() ? Path.GetPathRoot(fullPath) : NearestExistingDirectory(fullPath);
+            string? volume = OperatingSystem.IsWindows()
+                ? Path.GetPathRoot(fullPath)
+                : NearestExistingDirectory(fullPath);
             return string.IsNullOrEmpty(volume) ? null : new DriveInfo(volume).AvailableFreeSpace;
         }
         catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException)

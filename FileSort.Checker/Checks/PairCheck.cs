@@ -56,7 +56,8 @@ internal static class PairCheck
         ScanFeed feed,
         ScanStop stop)
     {
-        ChunkReader reader = new(stream, lineEnding, settings.ChunkSize, settings.MaxLineLength, keepPreviousLine: checkOrder);
+        ChunkReader reader = new(
+            stream, lineEnding, settings.ChunkSize, settings.MaxLineLength, keepPreviousLine: checkOrder);
         return new FileScan(reader, workers, lineEnding, settings, checkOrder, feed, stop);
     }
 
@@ -107,6 +108,7 @@ internal static class PairCheck
 
     private static Task<ScanResult> StartOnItsOwnThread(Func<ScanResult> scan)
     {
-        return Task.Factory.StartNew(scan, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        return Task.Factory.StartNew(
+            scan, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 }

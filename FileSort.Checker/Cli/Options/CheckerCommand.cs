@@ -1,8 +1,8 @@
 using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.Globalization;
 
 using FileSort.Checker.Checks;
+using FileSort.Cli.Options;
 
 namespace FileSort.Checker.Cli.Options;
 
@@ -15,11 +15,15 @@ internal sealed class CheckerCommand
     public CheckerCommand()
     {
         Input = PathOption(
-            "--input", "-i", "The input file of the sort: the file that the sorted file was made from. It is only read.");
+            "--input",
+            "-i",
+            "The input file of the sort: the file that the sorted file was made from. It is only read.");
 
         // Not --output: in the other programs --output is a file that the program writes, and the checker writes none.
         Sorted = PathOption(
-            "--sorted", "-s", "The sorted file, the output of the sorter, to check against the input. It is only read.");
+            "--sorted",
+            "-s",
+            "The sorted file, the output of the sorter, to check against the input. It is only read.");
 
         LineEnding = new Option<string>("--line-ending")
         {
@@ -38,7 +42,7 @@ internal sealed class CheckerCommand
                 + "logical processors. It does not change the result.",
             HelpName = "count",
             DefaultValueFactory = _ => ScanSettings.DefaultThreads,
-            CustomParser = ParseThreads,
+            CustomParser = CustomParsers.WholeNumber(1, ScanSettings.MaxThreads),
         };
 
         Root = new RootCommand(
@@ -97,22 +101,6 @@ internal sealed class CheckerCommand
         return option;
     }
 
-    // A whole number within the range, written with digits only. The option is named when the error is printed.
-    private static int ParseThreads(ArgumentResult result)
-    {
-        string text = result.Tokens[0].Value;
-        if (int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int threads)
-            && threads >= 1 && threads <= ScanSettings.MaxThreads)
-        {
-            return threads;
-        }
-
-        result.AddError(string.Create(
-            CultureInfo.InvariantCulture,
-            $"'{text}' is not accepted. Expected a whole number from 1 to {ScanSettings.MaxThreads}."));
-        return 0;
-    }
-
     // A file compared with itself always has "the same lines": a slip of the hand would get CORRECT for a check
     // that compared nothing. The paths are read as they were typed, because the value of an option that failed its
     // own check cannot be asked for here.
@@ -137,7 +125,9 @@ internal sealed class CheckerCommand
             return false;
         }
 
-        StringComparison names = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        StringComparison names = OperatingSystem.IsLinux()
+            ? StringComparison.Ordinal
+            : StringComparison.OrdinalIgnoreCase;
         try
         {
             return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), names);

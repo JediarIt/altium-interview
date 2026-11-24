@@ -14,7 +14,7 @@ public static class ExitCode
 
     public const int InvalidArguments = 2;
 
-    /// <summary>A file is not a valid <c>Number. String</c> file. Used by the checker.</summary>
+    /// <summary>A file is not a valid <c>Number. String</c> file. Used by the checker and the sorter.</summary>
     public const int InvalidFile = 3;
 
     /// <summary>

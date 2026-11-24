@@ -46,7 +46,8 @@ internal static class LineParser
         return LineFault.None;
     }
 
-    /// <summary>The digits of the Number of a valid line whose Number has <paramref name="numberLength"/> digits.</summary>
+    /// <summary>The digits of the Number of a valid line whose Number has <paramref name="numberLength"/>
+    /// digits.</summary>
     public static ReadOnlySpan<byte> Number(ReadOnlySpan<byte> line, int numberLength)
     {
         return line[..numberLength];

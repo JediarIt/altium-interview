@@ -10,6 +10,12 @@ namespace FileSort.Generator.Content.Lines;
 /// </summary>
 internal sealed class LineComposer
 {
+    /// <summary>
+    /// The most digits of a Number that the generator writes: a long Number of up to 30 digits with up to 3 leading
+    /// zeros. Longer Numbers are valid; the generator writes none.
+    /// </summary>
+    public const int MaxNumberDigits = MaxLongDigits + MaxLeadingZeros;
+
     // How the random values of a line are spent; RandomBits reads the groups of bits.
     //
     // The first value, the head:
@@ -20,28 +26,55 @@ internal sealed class LineComposer
     // Bit 31 is not used.
     //
     // The second value, the edge case roll, is drawn only when a category is enabled:
-    //   bits 0 to 23    which categories apply to the line, 4 bits each, see EdgeRoll
-    //   bits 24 to 26   big Numbers: all three are 0 in one case of 8, and then the Number is a boundary value
-    //   bits 27 to 28   which of the four boundary values
-    //   bits 29 to 33   the bit length of any other big Number, 33 to 64
-    //   bits 34 to 41   how many leading zeros, 1 to 3
+    //   bits 0 to 27    which categories apply to the line, 4 bits each, see EdgeRoll
+    //   bits 28 to 30   the kind of a big Number: 0 a boundary value, 1 a long Number, 2 to 7 a Number of 33 to 64
+    //                   bits
+    //   bits 31 to 38   which of the five boundary values
+    //   bits 39 to 43   the bit length of a Number of 33 to 64 bits
+    //   bits 44 to 51   the count of digits of a long Number, 21 to 30
+    //   bits 52 to 59   how many leading zeros, 1 to 3
     //
-    // Then the String takes its own values, see StringComposer.
+    // A Number of 33 to 64 bits takes one more random value, a long Number two. Then the String takes its own values,
+    // see StringComposer.
     private const int NumberLengthBits = 5;
     private const int PoolDecisionFirstBit = NumberLengthBits;
     private const int PoolDecisionBits = 16;
     private const int PoolIndexFirstBit = PoolDecisionFirstBit + PoolDecisionBits;
 
-    private const int BoundaryDecisionFirstBit = EdgeRoll.FreeBitsStart;
-    private const int BoundaryDecisionBits = 3;
-    private const int BoundaryIndexFirstBit = BoundaryDecisionFirstBit + BoundaryDecisionBits;
-    private const int BoundaryIndexBits = 2;
+    private const int BigKindFirstBit = EdgeRoll.FreeBitsStart;
+    private const int BigKindBits = 3;
+    private const int BoundaryIndexFirstBit = BigKindFirstBit + BigKindBits;
+    private const int BoundaryIndexBits = 8;
     private const int BigLengthFirstBit = BoundaryIndexFirstBit + BoundaryIndexBits;
     private const int BigLengthBits = 5;
-    private const int ZerosFirstBit = BigLengthFirstBit + BigLengthBits;
+    private const int LongDigitsFirstBit = BigLengthFirstBit + BigLengthBits;
+    private const int LongDigitsBits = 8;
+    private const int ZerosFirstBit = LongDigitsFirstBit + LongDigitsBits;
     private const int ZerosBits = 8;
 
+    // The kinds of a big Number, read from three bits: two of the eight values have a kind of their own, the other
+    // six give a Number of 33 to 64 bits.
+    private const int BoundaryKind = 0;
+    private const int LongKind = 1;
+
+    private const int MinLongDigits = 21;
+    private const int MaxLongDigits = 30;
+    private const int MaxLeadingZeros = 3;
+
+    // The digits that the longest line counts for its Number when no Number category is enabled. A plain Number has
+    // at most 10 digits, but content version 1 counted 20 for every line, and the longest line decides where a block
+    // ends: counting 10 would move the ends of the blocks and change the bytes of plain content, which version 2
+    // keeps.
+    private const int PlainNumberDigitsCounted = 20;
+
     private const EdgeCases NumberCategories = EdgeCases.BigNumbers | EdgeCases.LeadingZeros;
+
+    /// <summary>
+    /// The values where a comparer of Numbers is most likely to be wrong: around 2^32, 2^63 and 2^64. The last one is
+    /// the first Number that does not fit in 64 bits.
+    /// </summary>
+    private static readonly UInt128[] BoundaryNumbers =
+        [4294967296, 9223372036854775807, 9223372036854775808, LineFormat.MaxNumber, (UInt128)LineFormat.MaxNumber + 1];
 
     private readonly StringComposer _strings;
     private readonly RepeatPool? _pool;
@@ -56,22 +89,22 @@ internal sealed class LineComposer
         _duplicatesPercent = options.DuplicatesPercent;
         _enabled = options.EdgeCases;
         _lineEnding = options.LineEnding;
-        MaxLineLength = LineFormat.MaxNumberDigits + LineFormat.SeparatorLength + _strings.MaxLength
+
+        int numberDigits = (_enabled & NumberCategories) != 0 ? MaxNumberDigits : PlainNumberDigitsCounted;
+        int carriageReturn = (_enabled & EdgeCases.CarriageReturn) != 0 ? 1 : 0;
+        MaxLineLength = numberDigits + LineFormat.SeparatorLength + _strings.MaxLength + carriageReturn
             + _lineEnding.TerminatorLength();
     }
-
-    /// <summary>The values where a comparer of Numbers is most likely to be wrong: around 2^32, 2^63 and 2^64.</summary>
-    private static ReadOnlySpan<ulong> BoundaryNumbers =>
-        [4294967296, 9223372036854775807, 9223372036854775808, LineFormat.MaxNumber];
 
     /// <summary>The length of the longest line that these options can produce, terminator included.</summary>
     public int MaxLineLength { get; }
 
     /// <summary>
     /// Writes one line with its terminator and returns its length. The destination needs
-    /// <see cref="MaxLineLength"/> plus <see cref="StringComposer.Slack"/> bytes.
+    /// <see cref="MaxLineLength"/> plus <see cref="StringComposer.Slack"/> bytes. The first line of a file never gets
+    /// a carriage return at the end of its String, so that the line ending of a file can be told from that line.
     /// </summary>
-    public int WriteLine(ref Xoshiro256 random, Span<byte> destination)
+    public int WriteLine(ref Xoshiro256 random, Span<byte> destination, bool firstLineOfFile)
     {
         ulong head = random.Next();
 
@@ -110,6 +143,13 @@ internal sealed class LineComposer
             position += _strings.Compose(ref random, applied, destination[position..]);
         }
 
+        // The carriage return is decided for the line, so a pool String gets it too. Before a \r\n terminator the line
+        // ends with \r\r\n, which a reader with that line ending takes as a String that ends with \r.
+        if ((applied & EdgeCases.CarriageReturn) != 0 && !firstLineOfFile)
+        {
+            destination[position++] = LineFormat.CarriageReturn;
+        }
+
         position += LineWriter.WriteTerminator(destination[position..], _lineEnding);
         return position;
     }
@@ -126,33 +166,56 @@ internal sealed class LineComposer
     private static int WriteUnusualNumber(
         ref Xoshiro256 random, ulong head, ulong roll, EdgeCases applied, Span<byte> destination)
     {
-        ulong number;
-        if ((applied & EdgeCases.BigNumbers) == 0)
-        {
-            number = PlainNumber(head);
-        }
-        else if (RandomBits.Bits(roll, BoundaryDecisionFirstBit, BoundaryDecisionBits) == 0)
-        {
-            // One case of 8: one of the four boundary values.
-            number = BoundaryNumbers[RandomBits.Bits(roll, BoundaryIndexFirstBit, BoundaryIndexBits)];
-        }
-        else
-        {
-            // A Number of exactly 33 to 64 bits, so it never fits in 32 bits: with 33 bits it is from
-            // 2^32 = 4294967296 to 2^33 - 1.
-            int bitLength = 33 + RandomBits.Bits(roll, BigLengthFirstBit, BigLengthBits);
-            number = RandomBits.WithBitLength(random.Next(), bitLength);
-        }
+        UInt128 number = (applied & EdgeCases.BigNumbers) == 0 ? PlainNumber(head) : BigNumber(ref random, roll);
 
-        int zeros = 0;
-        if ((applied & EdgeCases.LeadingZeros) != 0)
-        {
-            // One to three zeros, as far as the limit of 20 digits allows: a Number of 18 digits gets at most two
-            // zeros, one of 20 digits none.
-            zeros = 1 + RandomBits.Pick(roll, ZerosFirstBit, ZerosBits, 3);
-            zeros = Math.Min(zeros, LineFormat.MaxNumberDigits - LineWriter.CountDigits(number));
-        }
+        // One to three zeros, about equally likely.
+        int zeros = (applied & EdgeCases.LeadingZeros) == 0
+            ? 0
+            : 1 + RandomBits.Pick(roll, ZerosFirstBit, ZerosBits, MaxLeadingZeros);
 
         return LineWriter.WriteNumber(destination, number, zeros);
+    }
+
+    private static UInt128 BigNumber(ref Xoshiro256 random, ulong roll)
+    {
+        switch (RandomBits.Bits(roll, BigKindFirstBit, BigKindBits))
+        {
+            case BoundaryKind:
+                // One case of 8: one of the five boundary values, each about equally likely.
+                int boundary = RandomBits.Pick(roll, BoundaryIndexFirstBit, BoundaryIndexBits, BoundaryNumbers.Length);
+                return BoundaryNumbers[boundary];
+
+            case LongKind:
+                // One case of 8: a Number of 21 to 30 digits, every count about equally likely. Even the smallest,
+                // 100000000000000000000, is above the largest Number of 64 bits.
+                int digits = MinLongDigits
+                    + RandomBits.Pick(roll, LongDigitsFirstBit, LongDigitsBits, MaxLongDigits - MinLongDigits + 1);
+                return LongNumber(ref random, digits);
+
+            default:
+                // Six cases of 8: a Number of exactly 33 to 64 bits, so it never fits in 32 bits: with 33 bits it is
+                // from 2^32 = 4294967296 to 2^33 - 1.
+                int bitLength = 33 + RandomBits.Bits(roll, BigLengthFirstBit, BigLengthBits);
+                return RandomBits.WithBitLength(random.Next(), bitLength);
+        }
+    }
+
+    // A Number of exactly the given count of digits: the smallest one, 10^(digits - 1), plus a random amount below
+    // 9 × 10^(digits - 1), which is how many Numbers have that count of digits. With 21 digits it lies from
+    // 100000000000000000000 to 999999999999999999999. The amount is the remainder of a random 128-bit value, made of
+    // two random values. A remainder favours some amounts over others, here by at most 9 × 10^29 / 2^128, less than
+    // one in 300 million.
+    private static UInt128 LongNumber(ref Xoshiro256 random, int digits)
+    {
+        // 10^(digits - 1) by multiplication: BigInteger.Pow would allocate on every call, and a block allocates
+        // nothing.
+        UInt128 smallest = 1;
+        for (int digit = 1; digit < digits; digit++)
+        {
+            smallest *= 10;
+        }
+
+        UInt128 random128 = new(random.Next(), random.Next());
+        return smallest + (random128 % (9 * smallest));
     }
 }

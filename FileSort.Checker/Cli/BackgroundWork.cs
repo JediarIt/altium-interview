@@ -13,7 +13,8 @@ internal static class BackgroundWork
     /// <paramref name="interval"/>, until the work has ended. A failure of the work leaves as it was thrown. If the
     /// watcher fails, the work is cancelled and has ended before the failure leaves.
     /// </summary>
-    public static T Run<T>(Func<CancellationToken, T> work, Action watch, TimeSpan interval, CancellationToken cancellationToken)
+    public static T Run<T>(
+        Func<CancellationToken, T> work, Action watch, TimeSpan interval, CancellationToken cancellationToken)
     {
         using CancellationTokenSource stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<T> task = Task.Run(() => work(stopping.Token), CancellationToken.None);

@@ -379,7 +379,8 @@ public sealed class GeneratorAppTests : IDisposable
     [Theory]
     [InlineData]
     [InlineData("--seed", "18446744073709551615")]
-    [InlineData("--seed", "5", "--duplicates", "0", "--words", "3", "--edge-cases", "empty,unicode", "--line-ending", "crlf")]
+    [InlineData(
+        "--seed", "5", "--duplicates", "0", "--words", "3", "--edge-cases", "empty,unicode", "--line-ending", "crlf")]
     [InlineData("--edge-cases", "all", "--threads", "2", "--buffered-io")]
     public void Reproducing_a_file(params string[] options)
     {
@@ -422,7 +423,8 @@ public sealed class GeneratorAppTests : IDisposable
         Assert.StartsWith($"{size} bytes", console.SummaryField("Size"));
         Assert.Equal(lines.ToString(CultureInfo.InvariantCulture), console.SummaryField("Lines"));
         Assert.Equal("42", console.SummaryField("Seed"));
-        Assert.Equal(ContentFormat.Version.ToString(CultureInfo.InvariantCulture), console.SummaryField("Content version"));
+        string version = ContentFormat.Version.ToString(CultureInfo.InvariantCulture);
+        Assert.Equal(version, console.SummaryField("Content version"));
         Assert.EndsWith("MiB/s", console.SummaryField("Throughput"));
         Assert.EndsWith("MiB", console.SummaryField("Peak working set"));
     }
@@ -442,10 +444,12 @@ public sealed class GeneratorAppTests : IDisposable
         Assert.Equal("1-5", console.SettingsField("Words"));
         Assert.Equal("none", console.SettingsField("Edge cases"));
         Assert.Equal("lf", console.SettingsField("Line ending"));
-        Assert.Equal(GeneratorSettings.DefaultThreads.ToString(CultureInfo.InvariantCulture), console.SettingsField("Threads"));
+        string threads = GeneratorSettings.DefaultThreads.ToString(CultureInfo.InvariantCulture);
+        Assert.Equal(threads, console.SettingsField("Threads"));
         Assert.Equal(OperatingSystem.IsWindows() ? "unbuffered" : "buffered", console.SettingsField("Write mode"));
         Assert.Equal("no", console.SettingsField("Overwrite"));
-        Assert.Equal(ContentFormat.Version.ToString(CultureInfo.InvariantCulture), console.SettingsField("Content version"));
+        string version = ContentFormat.Version.ToString(CultureInfo.InvariantCulture);
+        Assert.Equal(version, console.SettingsField("Content version"));
 
         // The seed was chosen by the generator: it is shown before the run and is the one in the summary.
         Assert.EndsWith("(chosen at random)", console.SettingsField("Seed"));
@@ -556,7 +560,8 @@ public sealed class GeneratorAppTests : IDisposable
     {
         FakeConsole console = new();
 
-        int exitCode = Run(console, "--output", _directory.File(Path.Combine("new", "directory", "out.txt")), "--size", "1MB");
+        string output = _directory.File(Path.Combine("new", "directory", "out.txt"));
+        int exitCode = Run(console, "--output", output, "--size", "1MB");
 
         Assert.Equal(ExitCode.Success, exitCode);
         Assert.Equal([Path.Combine("new", "directory", "out.txt")], _directory.FileNames());
@@ -584,7 +589,8 @@ public sealed class GeneratorAppTests : IDisposable
 
         Assert.True(failed);
         Assert.Equal(ExitCode.Failure, exitCode);
-        Assert.Contains("Cannot write to the console, so no file was written: The stream is broken.", console.ErrorText);
+        Assert.Contains(
+            "Cannot write to the console, so no file was written: The stream is broken.", console.ErrorText);
         Assert.DoesNotContain("   at ", console.ErrorText);
         Assert.Empty(_directory.FileNames());
 

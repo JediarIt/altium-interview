@@ -35,15 +35,18 @@ internal static class PlainNumberWriter
         {
             // 345 is "00000345" without its first five characters. The store writes "345" and five zero bytes,
             // which the rest of the line overwrites.
-            BinaryPrimitives.WriteUInt64LittleEndian(destination, DropFirstCharacters(EightAsciiDigits(value), 8 - digits));
+            ulong eightDigits = EightAsciiDigits(value);
+            BinaryPrimitives.WriteUInt64LittleEndian(destination, DropFirstCharacters(eightDigits, 8 - digits));
             return digits;
         }
 
         // Nine or ten digits: the one or two above the low eight come first. 4294967295 is "42" and then "94967295";
         // 123456789 is "01" without its zero and then "23456789", which starts at the second byte.
         uint top = value / EightDigits;
-        BinaryPrimitives.WriteUInt16LittleEndian(destination, (ushort)DropFirstCharacters(TwoAsciiDigits(top), 10 - digits));
-        BinaryPrimitives.WriteUInt64LittleEndian(destination[(digits - 8)..], EightAsciiDigits(value - (top * EightDigits)));
+        ushort topDigits = (ushort)DropFirstCharacters(TwoAsciiDigits(top), 10 - digits);
+        ulong lowDigits = EightAsciiDigits(value - (top * EightDigits));
+        BinaryPrimitives.WriteUInt16LittleEndian(destination, topDigits);
+        BinaryPrimitives.WriteUInt64LittleEndian(destination[(digits - 8)..], lowDigits);
         return digits;
     }
 

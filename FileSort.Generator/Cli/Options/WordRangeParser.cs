@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
+using FileSort.Cli.Options;
 using FileSort.Generator.Content;
 
 namespace FileSort.Generator.Cli.Options;

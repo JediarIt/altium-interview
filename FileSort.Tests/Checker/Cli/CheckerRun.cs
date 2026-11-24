@@ -44,17 +44,20 @@ internal sealed class CheckerRun : IDisposable
         return Check(input, sorted, ScanSettings.Default, CancellationToken.None, options);
     }
 
-    /// <summary>Runs the check with other settings of the scans than the defaults, and with a token to cancel it.</summary>
+    /// <summary>Runs the check with other settings of the scans than the defaults, and with a token to cancel
+    /// it.</summary>
     public int Check(string input, string sorted, ScanSettings scan, CancellationToken cancellationToken)
     {
         return Check(Encoding.UTF8.GetBytes(input), Encoding.UTF8.GetBytes(sorted), scan, cancellationToken);
     }
 
-    public int Check(byte[] input, byte[] sorted, ScanSettings scan, CancellationToken cancellationToken, params string[] options)
+    public int Check(
+        byte[] input, byte[] sorted, ScanSettings scan, CancellationToken cancellationToken, params string[] options)
     {
         File.WriteAllBytes(InputPath, input);
         File.WriteAllBytes(SortedPath, sorted);
-        return CheckerApp.Run(["--input", InputPath, "--sorted", SortedPath, .. options], Console, scan, cancellationToken);
+        string[] args = ["--input", InputPath, "--sorted", SortedPath, .. options];
+        return CheckerApp.Run(args, Console, scan, cancellationToken);
     }
 
     /// <summary>Runs the checker with exactly these arguments.</summary>
@@ -63,7 +66,8 @@ internal sealed class CheckerRun : IDisposable
         return CheckerApp.Run(args, Console, CancellationToken.None);
     }
 
-    /// <summary>The value of a field of the summary that stands at the start of a line, such as <c>Result</c>.</summary>
+    /// <summary>The value of a field of the summary that stands at the start of a line, such as
+    /// <c>Result</c>.</summary>
     public string Field(string name)
     {
         return Value(OutLines.Single(line => line.StartsWith(name + ":", StringComparison.Ordinal)), name);

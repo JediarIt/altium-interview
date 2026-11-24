@@ -61,7 +61,8 @@ public class PlainNumberWriterTests
         // value of those ranges is checked in every position of the eight low digits.
         for (uint group = 0; group < 10_000; group++)
         {
-            foreach (uint value in new[] { group, group * 10_000, (group * 10_000) + group, (group * 10_000) + 9_999 - group })
+            uint[] values = [group, group * 10_000, (group * 10_000) + group, (group * 10_000) + 9_999 - group];
+            foreach (uint value in values)
             {
                 Assert.Equal(value.ToString(CultureInfo.InvariantCulture), Write(value));
             }

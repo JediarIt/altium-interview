@@ -3,7 +3,8 @@ using FileSort.Checker.Lines;
 
 namespace FileSort.Checker.Checks;
 
-/// <summary>The result of checking a pair of files: the line ending they were read with and what each scan found.</summary>
+/// <summary>The result of checking a pair of files: the line ending they were read with and what each scan
+/// found.</summary>
 internal sealed record CheckResult(LineEnding LineEnding, bool LineEndingDetected, ScanResult Input, ScanResult Output)
 {
     /// <summary>

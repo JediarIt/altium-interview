@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -64,17 +65,26 @@ internal static class LineWriter
     }
 
     /// <summary>
-    /// Writes a Number with zeros in front of its canonical form. The format allows at most
-    /// <see cref="LineFormat.MaxNumberDigits"/> digits in total.
+    /// Writes a Number with zeros in front of its canonical form; with no zeros, the canonical form itself. The value
+    /// may be any of 128 bits, so this also writes the Numbers beyond 64 bits of the category big-numbers.
     /// </summary>
-    public static int WriteNumber(Span<byte> destination, ulong value, int leadingZeros)
+    public static int WriteNumber(Span<byte> destination, UInt128 value, int leadingZeros)
     {
-        int digits = CountDigits(value);
         ArgumentOutOfRangeException.ThrowIfNegative(leadingZeros);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(leadingZeros, LineFormat.MaxNumberDigits - digits);
+        destination[..leadingZeros].Fill((byte)'0');
+        Span<byte> digits = destination[leadingZeros..];
 
-        // "D" with a precision pads the digits with zeros up to that many.
-        return Format(destination, value, new StandardFormat('D', (byte)(leadingZeros + digits)));
+        // A value of 64 bits takes the formatter of 64-bit values, the faster one. A larger value is written by
+        // UInt128 itself, which writes UTF-8 like the other integer types; the invariant culture writes plain digits
+        // on every machine.
+        if (value <= ulong.MaxValue)
+        {
+            return leadingZeros + Format(digits, (ulong)value, default);
+        }
+
+        return value.TryFormat(digits, out int written, default, CultureInfo.InvariantCulture)
+            ? leadingZeros + written
+            : throw new ArgumentException("The destination is too small for the Number.", nameof(destination));
     }
 
     /// <summary>Writes the separator between the Number and the String.</summary>

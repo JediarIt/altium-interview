@@ -72,7 +72,8 @@ public class LineExcerptTests
 
         string shown = Format(line);
 
-        Assert.Equal("1. " + new string('x', LineSample.MaxBytes - 4) + $"... ({Encoding.UTF8.GetByteCount(line)} bytes)", shown);
+        string shortened = "1. " + new string('x', LineSample.MaxBytes - 4);
+        Assert.Equal($"{shortened}... ({Encoding.UTF8.GetByteCount(line)} bytes)", shown);
         Assert.DoesNotContain(@"\x", shown);
     }
 

@@ -49,7 +49,8 @@ public class ScanBenchmarks
     {
         ScanSettings settings = ScanSettings.Default;
         using MemoryStream stream = new(_sorted, writable: false);
-        ChunkReader reader = new(stream, LineEnding.Lf, settings.ChunkSize, settings.MaxLineLength, keepPreviousLine: order);
+        ChunkReader reader = new(
+            stream, LineEnding.Lf, settings.ChunkSize, settings.MaxLineLength, keepPreviousLine: order);
         long lines = 0;
         while (reader.Read() is Chunk chunk)
         {

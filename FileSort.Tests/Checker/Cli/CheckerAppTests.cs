@@ -61,7 +61,8 @@ public sealed class CheckerAppTests : IDisposable
     {
         _run.Run("--help");
 
-        Assert.All(["0 correct", "4 not correct", "3 a file is not valid", "130 cancelled"], text => Assert.Contains(text, _run.Out));
+        string[] codes = ["0 correct", "4 not correct", "3 a file is not valid", "130 cancelled"];
+        Assert.All(codes, text => Assert.Contains(text, _run.Out));
     }
 
     [Fact]
@@ -166,7 +167,8 @@ public sealed class CheckerAppTests : IDisposable
     {
         Assert.SkipUnless(OperatingSystem.IsWindows(), "File names differ by letter case on this file system.");
 
-        Assert.Equal(ExitCode.InvalidArguments, _run.Run("-i", _run.InputPath, "-s", _run.InputPath.ToUpperInvariant()));
+        string otherCase = _run.InputPath.ToUpperInvariant();
+        Assert.Equal(ExitCode.InvalidArguments, _run.Run("-i", _run.InputPath, "-s", otherCase));
         Assert.Contains("same file", _run.Error);
     }
 
@@ -215,7 +217,8 @@ public sealed class CheckerAppTests : IDisposable
     }
 
     [Theory]
-    [InlineData("415. Apple\n1. Apple\n2. Banana is yellow\n32. Cherry is the best\n30432. Something something something\n")]
+    [InlineData("415. Apple\n1. Apple\n2. Banana is yellow\n32. Cherry is the best\n"
+        + "30432. Something something something\n")]
     [InlineData("1. Apple\n415. Apple\n2. Banana is yellow\n32. Cherry is the best\n")]
     [InlineData("415. Apple\n1. Apple\n2. Banana is yellow\n32. Cherry is the best\n")]
     [InlineData("")]

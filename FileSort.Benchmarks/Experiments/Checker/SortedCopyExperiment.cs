@@ -40,7 +40,12 @@ internal static class SortedCopyExperiment
         {
             input, output,
         };
-        command.SetAction(result => Run(Path.GetFullPath(result.GetValue(input)!), Path.GetFullPath(result.GetValue(output)!)));
+        command.SetAction(result =>
+        {
+            string inputPath = Path.GetFullPath(result.GetValue(input)!);
+            string outputPath = Path.GetFullPath(result.GetValue(output)!);
+            Run(inputPath, outputPath);
+        });
         return command;
     }
 

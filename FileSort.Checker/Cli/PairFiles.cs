@@ -8,7 +8,8 @@ namespace FileSort.Checker.Cli;
 /// </summary>
 internal sealed class PairFiles : IDisposable
 {
-    private PairFiles(string inputPath, FileStream input, long inputSize, string sortedPath, FileStream sorted, long sortedSize)
+    private PairFiles(
+        string inputPath, FileStream input, long inputSize, string sortedPath, FileStream sorted, long sortedSize)
     {
         InputPath = inputPath;
         Input = input;

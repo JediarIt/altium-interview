@@ -38,11 +38,12 @@ public partial class ContentTests
         Assert.True(distinctLines < lines.Count, "No two lines are byte-identical.");
 
         // The README of the generator says "thousands of identical lines" in a file of this size.
-        Assert.True(lines.Count - distinctLines > 1000, $"Only {lines.Count - distinctLines} lines repeat an earlier line.");
+        int repeated = lines.Count - distinctLines;
+        Assert.True(repeated > 1000, $"Only {repeated} lines repeat an earlier line.");
 
         bool sharedString = lines
             .GroupBy(line => line.TextAsString)
-            .Any(group => group.Select(line => line.Number).Distinct().Count() > 1);
+            .Any(HasSeveralNumbers);
         Assert.True(sharedString, "No String occurs with two different Numbers.");
     }
 
@@ -109,14 +110,15 @@ public partial class ContentTests
     [Fact]
     public void Long_Strings_use_every_word_slot_of_a_random_value()
     {
-        List<NaiveLine> lines = TestContent.Lines(TestContent.Options(duplicates: 0, words: "40"), TestContent.Megabyte);
+        ContentOptions options = TestContent.Options(duplicates: 0, words: "40");
+        List<NaiveLine> lines = TestContent.Lines(options, TestContent.Megabyte);
 
         Assert.All(lines, line => Assert.Equal(40, WordCount(line)));
 
         // Every position of a long String draws from the whole dictionary.
         for (int position = 0; position < 40; position += 13)
         {
-            int distinct = lines.Select(line => line.TextAsString.Split(' ')[position].ToLowerInvariant()).Distinct().Count();
+            int distinct = lines.Select(line => WordAt(line, position)).Distinct().Count();
             Assert.True(distinct > 900, $"Position {position} has only {distinct} distinct words.");
         }
     }
@@ -135,7 +137,8 @@ public partial class ContentTests
     [Fact]
     public void With_default_options_short_Strings_repeat_by_chance_on_top_of_the_pool()
     {
-        // The README of the generator says "about 45%": 30% from the pool, plus the one-word Strings of the other lines.
+        // The README of the generator says "about 45%": 30% from the pool, plus the one-word Strings of the other
+        // lines.
         List<NaiveLine> lines = TestContent.Lines(TestContent.Options(), 10 * TestContent.Megabyte);
 
         Assert.InRange(TestContent.RepeatedShare(lines), 0.43, 0.47);
@@ -172,5 +175,17 @@ public partial class ContentTests
         Assert.Equal(ContentFormat.PoolSize, counts.Count);
         Assert.InRange(counts.Min(), mean * 0.6, mean);
         Assert.InRange(counts.Max(), mean, mean * 1.4);
+    }
+
+    // The lines of one String have more than one Number.
+    private static bool HasSeveralNumbers(IGrouping<string, NaiveLine> sameString)
+    {
+        return sameString.Select(line => line.Number).Distinct().Count() > 1;
+    }
+
+    // The word at a position of the String, in lower case.
+    private static string WordAt(NaiveLine line, int position)
+    {
+        return line.TextAsString.Split(' ')[position].ToLowerInvariant();
     }
 }

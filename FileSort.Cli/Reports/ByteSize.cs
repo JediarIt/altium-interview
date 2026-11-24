@@ -5,7 +5,8 @@ namespace FileSort.Cli.Reports;
 /// <summary>A size as it is printed: the exact number of bytes, and the same in a unit a person can read.</summary>
 public static class ByteSize
 {
-    /// <summary>For example <c>1073741824 bytes (1.00 GiB)</c>. The unit is binary, as everywhere in these programs.</summary>
+    /// <summary>For example <c>1073741824 bytes (1.00 GiB)</c>. The unit is binary, as everywhere in these
+    /// programs.</summary>
     public static string Describe(long bytes)
     {
         (double value, string unit) = bytes switch

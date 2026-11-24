@@ -25,9 +25,13 @@ public class LineParserTests
     private static Parsed Parse(byte[] line)
     {
         LineFault fault = LineParser.Parse(line, out int numberLength);
-        return fault == LineFault.None
-            ? new Parsed(fault, Encoding.ASCII.GetString(LineParser.Number(line, numberLength)), LineParser.Text(line, numberLength).ToArray())
-            : new Parsed(fault, "", []);
+        if (fault != LineFault.None)
+        {
+            return new Parsed(fault, "", []);
+        }
+
+        string number = Encoding.ASCII.GetString(LineParser.Number(line, numberLength));
+        return new Parsed(fault, number, LineParser.Text(line, numberLength).ToArray());
     }
 
     private static Parsed Parse(string line) => Parse(Encoding.UTF8.GetBytes(line));

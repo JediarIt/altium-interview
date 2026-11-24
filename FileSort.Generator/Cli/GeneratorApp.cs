@@ -7,7 +7,6 @@ using FileSort.Cli.Reports;
 using FileSort.Cli.Terminal;
 using FileSort.Generator.Cli.Options;
 using FileSort.Generator.Cli.Reports;
-using FileSort.Generator.Cli.Terminal;
 using FileSort.Generator.Content.Blocks;
 using FileSort.Generator.Output;
 using FileSort.Generator.Pipeline;
@@ -52,7 +51,8 @@ internal static class GeneratorApp
         }
     }
 
-    private static int GenerateFile(GeneratorSettings settings, IAppConsole console, CancellationToken cancellationToken)
+    private static int GenerateFile(
+        GeneratorSettings settings, IAppConsole console, CancellationToken cancellationToken)
     {
         string output = FullPath(settings.OutputPath);
         BlockGenerator generator = new(settings.Content);
@@ -132,11 +132,15 @@ internal static class GeneratorApp
     private static string? SpaceObstacle(string output, long required)
     {
         long replaced = OutputSpace.LengthOrZero(output) + OutputSpace.LengthOrZero(FileSink.TemporaryPath(output));
-        return OutputSpace.Available(output) is long free && !OutputSpace.Fits(required, free, replaced)
-            ? string.Create(
-                CultureInfo.InvariantCulture,
-                $"Not enough free space for '{output}': {required} bytes are required, {free + replaced} are available.")
-            : null;
+        if (OutputSpace.Available(output) is not long free || OutputSpace.Fits(required, free, replaced))
+        {
+            return null;
+        }
+
+        long available = free + replaced;
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Not enough free space for '{output}': {required} bytes are required, {available} are available.");
     }
 
     // An existing file is replaced only with consent: --overwrite, or a yes at the prompt.

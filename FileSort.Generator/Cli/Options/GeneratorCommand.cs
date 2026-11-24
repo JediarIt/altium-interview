@@ -1,10 +1,9 @@
 using System.Buffers.Binary;
 using System.CommandLine;
-using System.CommandLine.Parsing;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 
-using FileSort.Common;
+using FileSort.Cli.Options;
 using FileSort.Generator.Content;
 
 namespace FileSort.Generator.Cli.Options;
@@ -15,8 +14,6 @@ namespace FileSort.Generator.Cli.Options;
 /// </summary>
 internal sealed class GeneratorCommand
 {
-    private delegate bool ValueParser<T>(string text, out T value, [NotNullWhen(false)] out string? error);
-
     public GeneratorCommand()
     {
         Output = new Option<string>("--output", "-o")
@@ -43,7 +40,7 @@ internal sealed class GeneratorCommand
                 + "ends with the first line that reaches the size.",
             HelpName = "size",
             Required = true,
-            CustomParser = Parser<long>(SizeParser.TryParse),
+            CustomParser = CustomParsers.From<long>(SizeParser.TryParse),
         };
 
         Seed = new Option<ulong?>("--seed")
@@ -51,7 +48,7 @@ internal sealed class GeneratorCommand
             Description = "The seed of the content, a whole number from 0 to 18446744073709551615. The same seed "
                 + "and content options give the same bytes. Random when omitted; the summary prints the seed used.",
             HelpName = "number",
-            CustomParser = Parser<ulong?>((string text, out ulong? value, [NotNullWhen(false)] out string? error) =>
+            CustomParser = CustomParsers.From((string text, out ulong? value, [NotNullWhen(false)] out string? error) =>
             {
                 bool parsed = WholeNumberParser.TryParse(text, 0, ulong.MaxValue, out ulong number, out error);
                 value = number;
@@ -66,12 +63,7 @@ internal sealed class GeneratorCommand
                 + "repeat by chance, short ones most of all.",
             HelpName = "percent",
             DefaultValueFactory = _ => ContentOptions.DefaultDuplicatesPercent,
-            CustomParser = Parser<int>((string text, out int value, [NotNullWhen(false)] out string? error) =>
-            {
-                bool parsed = WholeNumberParser.TryParse(text, 0, 100, out ulong number, out error);
-                value = (int)number;
-                return parsed;
-            }),
+            CustomParser = CustomParsers.WholeNumber(0, 100),
         };
 
         Words = new Option<WordRange>("--words")
@@ -80,7 +72,7 @@ internal sealed class GeneratorCommand
                 + $"to {WordRange.Limit}.",
             HelpName = "range",
             DefaultValueFactory = _ => WordRange.Default,
-            CustomParser = Parser<WordRange>(WordRangeParser.TryParse),
+            CustomParser = CustomParsers.From<WordRange>(WordRangeParser.TryParse),
         };
 
         EdgeCases = new Option<EdgeCases>("--edge-cases")
@@ -89,7 +81,7 @@ internal sealed class GeneratorCommand
                 + $"{EdgeCaseNames.Accepted} (all of them). Without it every line is plain: a canonical Number "
                 + "below 2^32 and ASCII words that every comparer orders the same way.",
             HelpName = "list",
-            CustomParser = Parser<EdgeCases>(EdgeCaseNames.TryParse),
+            CustomParser = CustomParsers.From<EdgeCases>(EdgeCaseNames.TryParse),
         };
 
         LineEnding = new Option<string>("--line-ending")
@@ -107,12 +99,7 @@ internal sealed class GeneratorCommand
                 + "not change the content.",
             HelpName = "count",
             DefaultValueFactory = _ => GeneratorSettings.DefaultThreads,
-            CustomParser = Parser<int>((string text, out int value, [NotNullWhen(false)] out string? error) =>
-            {
-                bool parsed = WholeNumberParser.TryParse(text, 1, GeneratorSettings.MaxThreads, out ulong number, out error);
-                value = (int)number;
-                return parsed;
-            }),
+            CustomParser = CustomParsers.WholeNumber(1, GeneratorSettings.MaxThreads),
         };
 
         Overwrite = new Option<bool>("--overwrite")
@@ -195,20 +182,5 @@ internal sealed class GeneratorCommand
     private static ulong RandomSeed()
     {
         return BinaryPrimitives.ReadUInt64LittleEndian(RandomNumberGenerator.GetBytes(sizeof(ulong)));
-    }
-
-    // Wraps a value parser as the custom parser of an option. The option is named when the error is printed.
-    private static Func<ArgumentResult, T?> Parser<T>(ValueParser<T> parser)
-    {
-        return result =>
-        {
-            if (parser(result.Tokens[0].Value, out T value, out string? error))
-            {
-                return value;
-            }
-
-            result.AddError(error);
-            return default;
-        };
     }
 }

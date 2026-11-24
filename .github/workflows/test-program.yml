@@ -2,7 +2,7 @@ name: Test a program
 
 # The steps that the workflow of every program runs, kept in one place: build the solution, run the tests of the
 # program with code coverage, publish the summaries and fail when the assemblies of the program, taken together,
-# are under 80% of their lines. It is called by generator.yml and checker.yml and never starts by itself.
+# are under 80% of their lines. It is called by generator.yml, checker.yml and sorter.yml and never starts by itself.
 on:
   workflow_call:
     inputs:

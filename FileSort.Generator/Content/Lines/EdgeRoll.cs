@@ -12,7 +12,7 @@ namespace FileSort.Generator.Content.Lines;
 internal static class EdgeRoll
 {
     /// <summary>The number of categories; category <c>i</c> owns the bits <c>4i</c> to <c>4i + 3</c>.</summary>
-    public const int CategoryCount = 6;
+    public const int CategoryCount = 7;
 
     /// <summary>The first bit of the roll that the categories do not use.</summary>
     public const int FreeBitsStart = CategoryCount * BitsPerCategory;
@@ -39,8 +39,8 @@ internal static class EdgeRoll
     }
 
     // The flag of category i is bit i of EdgeCases, as the enum declares it: 1 << 0 is Unicode, 1 << 1 is Separator,
-    // and so on. The order of the enum is therefore part of the content version. A table of the six flags would read
-    // the same, but the machine code of Apply doubled with it, and Apply runs once per line.
+    // and so on. The order of the enum is therefore part of the content version. A table of the flags would read the
+    // same, but the machine code of Apply doubled with it, and Apply runs once per line.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static EdgeCases Flag(int category)
     {

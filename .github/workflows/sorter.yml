@@ -1,0 +1,88 @@
+name: Sorter
+
+# Builds the solution and runs the tests of the sorter and its engine with code coverage. It starts when something
+# changes that can affect the sorter or its tests: its code, the engine, the console library, the line format, the
+# tests, the build files, and also the generator and the checker, because the tests of the sorter make their inputs
+# with the one and check outputs with the other. The tests of the generator and of the checker are their business,
+# except the helpers in their folders that the tests of the sorter use. A commit that touches only documentation or
+# the OpenSpec artifacts does not start it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FileSort.Sorter/**'
+      - 'FileSort.Engine/**'
+      - 'FileSort.Cli/**'
+      - 'FileSort.Common/**'
+      - 'FileSort.Generator/**'
+      - 'FileSort.Checker/**'
+      - 'FileSort.Benchmarks/**'
+      - 'FileSort.Tests/**'
+      - 'FileSort.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - '.editorconfig'
+      - '.github/workflows/test-program.yml'
+      - '.github/workflows/sorter.yml'
+      - '.github/scripts/**'
+      # The tests of the generator and of the checker are theirs...
+      - '!FileSort.Tests/Generator/**'
+      - '!FileSort.Tests/Checker/**'
+      # ...apart from the helpers that make inputs and check outputs for the tests of the sorter...
+      - 'FileSort.Tests/Generator/TestContent.cs'
+      - 'FileSort.Tests/Generator/MemorySink.cs'
+      - 'FileSort.Tests/Checker/Checks/TestCheck.cs'
+      # ...and documentation inside the project folders is not code...
+      - '!FileSort.*/**/*.md'
+      # ...except the README whose options table a test compares with the command line.
+      - 'FileSort.Sorter/README.md'
+  pull_request:
+    paths:
+      - 'FileSort.Sorter/**'
+      - 'FileSort.Engine/**'
+      - 'FileSort.Cli/**'
+      - 'FileSort.Common/**'
+      - 'FileSort.Generator/**'
+      - 'FileSort.Checker/**'
+      - 'FileSort.Benchmarks/**'
+      - 'FileSort.Tests/**'
+      - 'FileSort.slnx'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'nuget.config'
+      - '.editorconfig'
+      - '.github/workflows/test-program.yml'
+      - '.github/workflows/sorter.yml'
+      - '.github/scripts/**'
+      # The tests of the generator and of the checker are theirs...
+      - '!FileSort.Tests/Generator/**'
+      - '!FileSort.Tests/Checker/**'
+      # ...apart from the helpers that make inputs and check outputs for the tests of the sorter...
+      - 'FileSort.Tests/Generator/TestContent.cs'
+      - 'FileSort.Tests/Generator/MemorySink.cs'
+      - 'FileSort.Tests/Checker/Checks/TestCheck.cs'
+      # ...and documentation inside the project folders is not code...
+      - '!FileSort.*/**/*.md'
+      # ...except the README whose options table a test compares with the command line.
+      - 'FileSort.Sorter/README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer commit on the same branch makes the run of an older one pointless.
+concurrency:
+  group: sorter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    uses: ./.github/workflows/test-program.yml
+    with:
+      program: sorter
+      # The sorter, its engine, the naive parser and sort that their tests rely on, the console library.
+      namespaces: FileSort.Tests.Sorter* FileSort.Tests.Engine* FileSort.Tests.Format* FileSort.Tests.Cli*
+      assemblies: FileSort.Sorter,FileSort.Engine,FileSort.Cli

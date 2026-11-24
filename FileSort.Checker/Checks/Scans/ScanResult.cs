@@ -26,6 +26,8 @@ internal sealed record ScanResult
     /// <summary>The order check; only the scan of the output makes one.</summary>
     public OrderResult Order { get; init; }
 
-    /// <summary>The file has lines followed by a terminator, and every one of them ends with a carriage return.</summary>
-    public bool EveryTerminatedLineEndsWithCarriageReturn => TerminatedLines > 0 && CarriageReturnEndings == TerminatedLines;
+    /// <summary>The file has lines followed by a terminator, and every one of them ends with a carriage
+    /// return.</summary>
+    public bool EveryTerminatedLineEndsWithCarriageReturn =>
+        TerminatedLines > 0 && CarriageReturnEndings == TerminatedLines;
 }

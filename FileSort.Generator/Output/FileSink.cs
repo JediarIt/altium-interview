@@ -21,13 +21,16 @@ namespace FileSort.Generator.Output;
 /// </remarks>
 internal sealed class FileSink : IBlockSink, IDisposable
 {
-    /// <summary>Lengths and offsets of unbuffered writes are multiples of this: the sector size of most disks.</summary>
+    /// <summary>Lengths and offsets of unbuffered writes are multiples of this: the sector size of most
+    /// disks.</summary>
     public const int Alignment = 4096;
 
-    /// <summary>The chunk of the unbuffered mode. Chosen by the write-path experiment (see the README of this project, Performance).</summary>
+    /// <summary>The chunk of the unbuffered mode. Chosen by the write-path experiment (see the README of this project,
+    /// Performance).</summary>
     public const int UnbufferedChunkSize = 16 * 1024 * 1024;
 
-    /// <summary>The chunk of the buffered mode. Chosen by the write-path experiment (see the README of this project, Performance).</summary>
+    /// <summary>The chunk of the buffered mode. Chosen by the write-path experiment (see the README of this project,
+    /// Performance).</summary>
     public const int BufferedChunkSize = 1024 * 1024;
 
     // FILE_FLAG_NO_BUFFERING. FileOptions has no name for it, but the runtime passes the value through to CreateFile.
@@ -101,7 +104,8 @@ internal sealed class FileSink : IBlockSink, IDisposable
         return (length + Alignment - 1) / Alignment * Alignment;
     }
 
-    /// <summary>The path of the temporary file for an output path: the same directory, so the move stays on one volume.</summary>
+    /// <summary>The path of the temporary file for an output path: the same directory, so the move stays on one
+    /// volume.</summary>
     public static string TemporaryPath(string outputPath)
     {
         return outputPath + ".tmp";

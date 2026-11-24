@@ -12,7 +12,8 @@ namespace FileSort.Cli;
 /// </summary>
 public static class CommandRunner
 {
-    /// <summary>Returns the exit code: of the action of the command, 0 for help or version, 2 for a parse error.</summary>
+    /// <summary>Returns the exit code: of the action of the command, 0 for help or version, 2 for a parse
+    /// error.</summary>
     public static int Run(RootCommand root, string[] args, IAppConsole console)
     {
         ArgumentNullException.ThrowIfNull(root);

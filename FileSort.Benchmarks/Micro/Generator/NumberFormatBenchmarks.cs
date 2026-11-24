@@ -32,7 +32,8 @@ public class NumberFormatBenchmarks
         Xoshiro256 random = Xoshiro256.Create(1, 0);
         for (int i = 0; i < Values; i++)
         {
-            // The way the generator draws a plain Number: a bit length from 1 to 32, then that many of the highest bits.
+            // The way the generator draws a plain Number: a bit length from 1 to 32, then that many of the highest
+            // bits.
             ulong value = random.Next();
             _numbers[i] = (uint)RandomBits.Highest(value, RandomBits.Bits(value, 0, 5) + 1);
         }

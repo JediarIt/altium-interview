@@ -33,7 +33,8 @@ internal sealed class FindingsOutput(IAppConsole console)
         }
     }
 
-    /// <summary>Says on the error stream that findings were lost, if they were and if that stream can be written to.</summary>
+    /// <summary>Says on the error stream that findings were lost, if they were and if that stream can be written
+    /// to.</summary>
     public void ReportLoss()
     {
         if (_failure is not null)

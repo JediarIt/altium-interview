@@ -4,6 +4,12 @@ namespace FileSort.Tests.Checker.Cli;
 
 public class BackgroundWorkTests
 {
+    // Work that fails at once.
+    private static int Breaks(CancellationToken cancellationToken)
+    {
+        throw new InvalidOperationException("Something broke.");
+    }
+
     private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(10);
 
     [Fact]
@@ -52,7 +58,7 @@ public class BackgroundWorkTests
     public void A_failure_of_the_work_leaves_as_it_was_thrown()
     {
         InvalidOperationException e = Assert.Throws<InvalidOperationException>(
-            () => BackgroundWork.Run<int>(_ => throw new InvalidOperationException("Something broke."), () => { }, Interval, CancellationToken.None));
+            () => BackgroundWork.Run(Breaks, () => { }, Interval, CancellationToken.None));
 
         Assert.Equal("Something broke.", e.Message);
     }

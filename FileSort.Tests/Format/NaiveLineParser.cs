@@ -11,7 +11,8 @@ namespace FileSort.Tests.Format;
 /// </summary>
 internal static class NaiveLineParser
 {
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding StrictUtf8 =
+        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <summary>
     /// Splits a file into lines at the given terminator, <c>"\n"</c> or <c>"\r\n"</c>. A byte order mark at the start

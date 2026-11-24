@@ -15,7 +15,8 @@ public interface IAppConsole
     [SuppressMessage(
         "Naming",
         "CA1716:Identifiers should not match keywords",
-        Justification = "Named after Console.Error, which it stands for; the library has no callers in other languages.")]
+        Justification = "Named after Console.Error, which it stands for; the library has no callers in other "
+            + "languages.")]
     TextWriter Error { get; }
 
     bool IsInputRedirected { get; }

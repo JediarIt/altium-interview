@@ -15,7 +15,12 @@ internal static class RunSummary
     private const double Mebibyte = 1024 * 1024;
 
     public static void Write(
-        TextWriter writer, GeneratorSettings settings, string outputPath, GenerationResult result, bool unbuffered, TimeSpan elapsed)
+        TextWriter writer,
+        GeneratorSettings settings,
+        string outputPath,
+        GenerationResult result,
+        bool unbuffered,
+        TimeSpan elapsed)
     {
         CultureInfo invariant = CultureInfo.InvariantCulture;
         double seconds = Math.Max(elapsed.TotalSeconds, 0.001);
@@ -27,7 +32,8 @@ internal static class RunSummary
         writer.WriteLine(string.Create(invariant, $"Average line:     {result.Bytes / (double)result.Lines:F1} bytes"));
         writer.WriteLine(string.Create(invariant, $"Seed:             {settings.Content.Seed}"));
         writer.WriteLine(string.Create(invariant, $"Content version:  {ContentFormat.Version}"));
-        writer.WriteLine(string.Create(invariant, $"Write mode:       {(unbuffered ? "unbuffered" : "buffered")}, {settings.Threads} threads"));
+        string mode = unbuffered ? "unbuffered" : "buffered";
+        writer.WriteLine(string.Create(invariant, $"Write mode:       {mode}, {settings.Threads} threads"));
         writer.WriteLine(string.Create(invariant, $"Elapsed:          {elapsed.TotalSeconds:F2} s"));
         writer.WriteLine(string.Create(invariant, $"Throughput:       {result.Bytes / Mebibyte / seconds:F0} MiB/s"));
         writer.WriteLine(string.Create(invariant, $"Peak working set: {process.PeakWorkingSet64 / Mebibyte:F0} MiB"));

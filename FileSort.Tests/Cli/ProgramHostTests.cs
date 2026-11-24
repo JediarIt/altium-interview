@@ -3,7 +3,8 @@ using FileSort.Cli.Terminal;
 
 namespace FileSort.Tests.Cli;
 
-/// <summary>What the entry point adds around an application, without the console and the signals of the process.</summary>
+/// <summary>What the entry point adds around an application, without the console and the signals of the
+/// process.</summary>
 public class ProgramHostTests
 {
     [Fact]

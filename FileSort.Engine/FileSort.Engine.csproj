@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The sorting engine: a class library with no console dependencies, so tests and measurements run it in-process
+    and FileSort.Sorter is only a host around it. A test fails if this assembly references any console code.
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileSort.Tests" />
+    <InternalsVisibleTo Include="FileSort.Benchmarks" />
+  </ItemGroup>
+
+</Project>

@@ -1,11 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    A thin console host over FileSort.Engine: the command line, the console output and the exit codes. It runs on the
+    regular .NET runtime; it is not published as a standalone executable.
+  -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
+    <ProjectReference Include="..\FileSort.Engine\FileSort.Engine.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="FileSort.Tests" />
+    <InternalsVisibleTo Include="FileSort.Benchmarks" />
   </ItemGroup>
 
 </Project>

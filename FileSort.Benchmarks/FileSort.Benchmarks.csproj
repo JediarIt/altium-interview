@@ -12,8 +12,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FileSort.Checker\FileSort.Checker.csproj" />
+    <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
     <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
+    <ProjectReference Include="..\FileSort.Engine\FileSort.Engine.csproj" />
     <ProjectReference Include="..\FileSort.Generator\FileSort.Generator.csproj" />
+    <ProjectReference Include="..\FileSort.Sorter\FileSort.Sorter.csproj" />
   </ItemGroup>
 
 </Project>

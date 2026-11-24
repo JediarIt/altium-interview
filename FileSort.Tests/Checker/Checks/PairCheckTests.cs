@@ -186,7 +186,8 @@ public class PairCheckTests
     [Fact]
     public void A_line_is_missing()
     {
-        CheckResult result = TestCheck.Run(Example, SortedExample.Replace("2. Banana is yellow\n", "", StringComparison.Ordinal));
+        string withoutALine = SortedExample.Replace("2. Banana is yellow\n", "", StringComparison.Ordinal);
+        CheckResult result = TestCheck.Run(Example, withoutALine);
 
         Assert.Equal(CheckOutcome.NotCorrect, result.Outcome);
         Assert.True(result.InOrder);
@@ -221,7 +222,8 @@ public class PairCheckTests
     [Fact]
     public void One_byte_changed()
     {
-        CheckResult result = TestCheck.Run(Example, SortedExample.Replace("Cherry", "Cherri", StringComparison.Ordinal));
+        string changed = SortedExample.Replace("Cherry", "Cherri", StringComparison.Ordinal);
+        CheckResult result = TestCheck.Run(Example, changed);
 
         Assert.Equal(CheckOutcome.NotCorrect, result.Outcome);
         Assert.True(result.InOrder);
@@ -372,7 +374,8 @@ public class PairCheckTests
         Assert.False(TestCheck.Run("2. Banana\n1. Apple\n", "").LineEndingsSeemToDiffer);
 
         // Every line of both files ends with a carriage return: with \n given, that is what the Strings are.
-        Assert.False(TestCheck.Run("2. Banana\r\n1. Apple\r\n", "1. Apple\r\n2. Banana\r\n", LineEnding.Lf).LineEndingsSeemToDiffer);
+        CheckResult withLf = TestCheck.Run("2. Banana\r\n1. Apple\r\n", "1. Apple\r\n2. Banana\r\n", LineEnding.Lf);
+        Assert.False(withLf.LineEndingsSeemToDiffer);
 
         // Read with \r\n, a carriage return at the end of every String is not a sign of anything.
         Assert.False(TestCheck.Run("1. Apple\r\n", "1. Apple\r\r\n", LineEnding.CrLf).LineEndingsSeemToDiffer);
@@ -511,7 +514,8 @@ public class PairCheckTests
         using MemoryStream output = new(Utf8(SortedExample));
 
         // No line ending is given, so the check starts by looking for one in the input.
-        CheckResult result = PairCheck.Run(input, output, lineEnding: null, Small, new ScanFeed(), CancellationToken.None);
+        CheckResult result = PairCheck.Run(
+            input, output, lineEnding: null, Small, new ScanFeed(), CancellationToken.None);
 
         Assert.Equal(CheckOutcome.NotChecked, result.Outcome);
         Assert.Equal(ScanEnd.Failed, result.Input.End);
@@ -528,7 +532,8 @@ public class PairCheckTests
         ScanSettings settings = new() { ChunkSize = 64 * 1024, MaxLineLength = 4096 };
 
         // Without the stop this check would never end: the output has no end.
-        CheckResult result = PairCheck.Run(input, output, LineEnding.Lf, settings, new ScanFeed(), CancellationToken.None);
+        CheckResult result = PairCheck.Run(
+            input, output, LineEnding.Lf, settings, new ScanFeed(), CancellationToken.None);
 
         Assert.Equal(CheckOutcome.InvalidFile, result.Outcome);
         Assert.Equal(ScanEnd.InvalidLine, result.Input.End);
@@ -567,7 +572,8 @@ public class PairCheckTests
         Stopwatch stopwatch = Stopwatch.StartNew();
         cancellation.Cancel();
 
-        AggregateException e = Assert.Throws<AggregateException>(() => check.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
+        AggregateException e = Assert.Throws<AggregateException>(
+            () => check.Wait(TimeSpan.FromSeconds(30), TestContext.Current.CancellationToken));
 
         Assert.IsAssignableFrom<OperationCanceledException>(e.InnerException);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2), $"The check stopped after {stopwatch.Elapsed}.");

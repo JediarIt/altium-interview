@@ -56,7 +56,8 @@ internal static class FileSinkExperiment
         }
 
         Console.WriteLine($"File: {file}, size: {Measure.Size(size)}");
-        Measure.Header("Write mode", "Chunk, MiB", "Way of writing", "Median, MiB/s", "Min", "Max", "Median / raw", "Runs");
+        Measure.Header(
+            "Write mode", "Chunk, MiB", "Way of writing", "Median, MiB/s", "Min", "Max", "Median / raw", "Runs");
 
         foreach (string mode in modes)
         {
@@ -78,7 +79,9 @@ internal static class FileSinkExperiment
             }
 
             double rawMedian = RunStatistics.From(raw).Median;
-            foreach ((string way, List<double> values) in new[] { ("Raw write", raw), ("One buffer", oneBuffer), ("File sink", sink) })
+            (string Way, List<double> Values)[] ways =
+                [("Raw write", raw), ("One buffer", oneBuffer), ("File sink", sink)];
+            foreach ((string way, List<double> values) in ways)
             {
                 RunStatistics result = RunStatistics.From(values);
                 Measure.Row(

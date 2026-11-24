@@ -21,9 +21,12 @@ public class BreakageCatalogueTests
 {
     private static readonly byte[] Mark = [0xEF, 0xBB, 0xBF];
 
-    private static readonly Lazy<SortedPair> PlainPair = new(() => SortedPair.Generated(EdgeCases.None, CommonLineEnding.Lf));
-    private static readonly Lazy<SortedPair> EdgeCasePair = new(() => SortedPair.Generated(EdgeCases.All, CommonLineEnding.Lf));
-    private static readonly Lazy<SortedPair> CrLfPair = new(() => SortedPair.Generated(EdgeCases.None, CommonLineEnding.CrLf));
+    private static readonly Lazy<SortedPair> PlainPair =
+        new(() => SortedPair.Generated(EdgeCases.None, CommonLineEnding.Lf));
+    private static readonly Lazy<SortedPair> EdgeCasePair =
+        new(() => SortedPair.Generated(EdgeCases.All, CommonLineEnding.Lf));
+    private static readonly Lazy<SortedPair> CrLfPair =
+        new(() => SortedPair.Generated(EdgeCases.None, CommonLineEnding.CrLf));
 
     private static SortedPair Plain => PlainPair.Value;
 
@@ -134,7 +137,8 @@ public class BreakageCatalogueTests
     public void One_byte_of_a_String_changed_with_the_order_kept()
     {
         List<NaiveLine> lines = [.. Plain.Lines];
-        int at = Enumerable.Range(lines.Count / 2, lines.Count / 4).First(i => KeepsOrderWithItsLastLetterRaised(lines, i));
+        IEnumerable<int> thirdQuarter = Enumerable.Range(lines.Count / 2, lines.Count / 4);
+        int at = thirdQuarter.First(i => KeepsOrderWithItsLastLetterRaised(lines, i));
         lines[at] = WithItsLastLetterRaised(lines[at]);
 
         CheckResult result = Check(Plain, lines);
@@ -209,7 +213,7 @@ public class BreakageCatalogueTests
     public void The_file_cut_inside_a_String_between_two_characters()
     {
         List<byte[]> lines = Plain.RawLines();
-        int at = lines.FindIndex(lines.Count / 2, line => line.Length > 16 && line.All(b => b < 0x80));
+        int at = lines.FindIndex(lines.Count / 2, line => line.Length > 16 && Ascii.IsValid(line));
 
         // Everything after the cut is gone, and the last line lost its last three letters; what is left of it is
         // a valid line: a plain Number has at most ten digits.
@@ -257,13 +261,19 @@ public class BreakageCatalogueTests
         Assert.Equal(OrderViolationKind.NumbersOutOfOrder, violation.Kind);
     }
 
+    // The lines of one String with their Numbers ordered as text, as a sorter that compares digits as text would.
+    private static IEnumerable<NaiveLine> NumbersAsText(IEnumerable<NaiveLine> sameString)
+    {
+        return sameString.OrderBy(line => line.NumberText, StringComparer.Ordinal);
+    }
+
     [Fact]
     public void Numbers_ordered_as_text_within_equal_Strings()
     {
         // The Strings stay in their order; within the lines of one String the Numbers go as text: 10 before 9.
         IEnumerable<NaiveLine> lines = Plain.Lines
             .GroupBy(line => line.TextAsString)
-            .SelectMany(sameString => sameString.OrderBy(line => line.NumberText, StringComparer.Ordinal));
+            .SelectMany(NumbersAsText);
 
         CheckResult result = Check(Plain, lines);
 
@@ -317,7 +327,7 @@ public class BreakageCatalogueTests
     public void The_file_cut_inside_a_character_of_several_bytes()
     {
         List<byte[]> lines = EdgeCase.RawLines();
-        int at = lines.FindIndex(lines.Count / 2, line => line.Any(b => b >= 0x80));
+        int at = lines.FindIndex(lines.Count / 2, line => !Ascii.IsValid(line));
         int firstByte = Array.FindIndex(lines[at], b => b >= 0x80);
 
         // The cut falls after the first byte of the character.

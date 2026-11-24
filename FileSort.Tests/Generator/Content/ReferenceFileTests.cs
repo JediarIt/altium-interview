@@ -18,10 +18,11 @@ namespace FileSort.Tests.Generator.Content;
 /// </summary>
 public sealed class ReferenceFileTests : IDisposable
 {
-    // Seed 1, size 1MB, default options.
+    // Seed 1, size 1MB, default options. Version 2 added edge cases only, so plain content kept its bytes.
     private static readonly Dictionary<int, string> DefaultOptionsHash = new()
     {
         [1] = "1CF4ADB5E34ABC7CEFF7069BE44265B4ACE2917F5B7C16E802F7D6534287C692",
+        [2] = "1CF4ADB5E34ABC7CEFF7069BE44265B4ACE2917F5B7C16E802F7D6534287C692",
     };
 
     // Seed 1, size 1MB, every content option changed:
@@ -29,6 +30,7 @@ public sealed class ReferenceFileTests : IDisposable
     private static readonly Dictionary<int, string> ChangedOptionsHash = new()
     {
         [1] = "4BC5790DC1BA84D706EA14517FB07136F93A45DFB780CBA5717EC73D5814D4D2",
+        [2] = "A358C2ECE658628D04066684A1D7EDC6DD1274DA4F753A57F0128EA42C4FEB73",
     };
 
     private readonly TempDirectory _directory = new();
@@ -114,8 +116,9 @@ public sealed class ReferenceFileTests : IDisposable
         using HashingSink other = new();
 
         GenerationPipeline.Run(generator, 4 * 1024 * 1024, 4, frozen, CancellationToken.None);
+        int halfCapacity = ContentFormat.BlockCapacity / 2;
         GenerationPipeline.Run(
-            generator, 4 * 1024 * 1024, 4, other, CancellationToken.None, blockCapacity: ContentFormat.BlockCapacity / 2);
+            generator, 4 * 1024 * 1024, 4, other, CancellationToken.None, blockCapacity: halfCapacity);
 
         Assert.Equal(1024 * 1024, ContentFormat.BlockCapacity);
         Assert.NotEqual(frozen.GetHashHex(), other.GetHashHex());

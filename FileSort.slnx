@@ -3,6 +3,7 @@
   <Project Path="FileSort.Checker/FileSort.Checker.csproj" />
   <Project Path="FileSort.Cli/FileSort.Cli.csproj" />
   <Project Path="FileSort.Common/FileSort.Common.csproj" />
+  <Project Path="FileSort.Engine/FileSort.Engine.csproj" />
   <Project Path="FileSort.Generator/FileSort.Generator.csproj" />
   <Project Path="FileSort.Sorter/FileSort.Sorter.csproj" />
   <Project Path="FileSort.Tests/FileSort.Tests.csproj" />

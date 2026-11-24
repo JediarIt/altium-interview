@@ -13,7 +13,13 @@ namespace FileSort.Checker.Checks.Scans;
 /// The digest is a sum, so the chunks need no order for it.
 /// </summary>
 internal sealed class FileScan(
-    ChunkReader reader, ChunkWorkers workers, LineEnding lineEnding, ScanSettings settings, bool checkOrder, ScanFeed feed, ScanStop stop)
+    ChunkReader reader,
+    ChunkWorkers workers,
+    LineEnding lineEnding,
+    ScanSettings settings,
+    bool checkOrder,
+    ScanFeed feed,
+    ScanStop stop)
 {
     private readonly ChunkReader _reader = reader;
     private readonly ChunkWorkers _workers = workers;

@@ -131,8 +131,9 @@ public class PipelineTests
     {
         List<long> reports = [];
 
+        BlockGenerator generator = new(TestContent.Options());
         GenerationResult result = GenerationPipeline.Run(
-            new BlockGenerator(TestContent.Options()), 5 * Megabyte, 4, new DiscardingSink(), CancellationToken.None, reports.Add);
+            generator, 5 * Megabyte, 4, new DiscardingSink(), CancellationToken.None, reports.Add);
 
         Assert.Equal(reports.Order(), reports);
         Assert.Equal(result.Bytes, reports[^1]);

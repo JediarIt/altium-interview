@@ -6,7 +6,8 @@ namespace FileSort.Tests.Generator.Content.Words;
 
 public class WordListTests
 {
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+    private static readonly UTF8Encoding StrictUtf8 =
+        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     private static List<string> DictionaryWords()
     {
@@ -15,7 +16,8 @@ public class WordListTests
 
     private static List<string> NonAsciiWordList()
     {
-        return [.. Enumerable.Range(0, NonAsciiWords.WordCount).Select(i => StrictUtf8.GetString(NonAsciiWords.Word(i)))];
+        IEnumerable<int> indexes = Enumerable.Range(0, NonAsciiWords.WordCount);
+        return [.. indexes.Select(i => StrictUtf8.GetString(NonAsciiWords.Word(i)))];
     }
 
     [Fact]

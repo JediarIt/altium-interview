@@ -21,7 +21,8 @@ internal static class RunSettings
 
         writer.WriteLine($"Generating:       {outputPath}");
         writer.WriteLine($"Requested size:   {ByteSize.Describe(settings.Size)}");
-        writer.WriteLine(string.Create(invariant, $"Seed:             {content.Seed}{(settings.SeedIsRandom ? " (chosen at random)" : "")}"));
+        string chosen = settings.SeedIsRandom ? " (chosen at random)" : "";
+        writer.WriteLine(string.Create(invariant, $"Seed:             {content.Seed}{chosen}"));
         writer.WriteLine(string.Create(invariant, $"Duplicates:       {content.DuplicatesPercent}%"));
         writer.WriteLine($"Words:            {content.Words}");
         writer.WriteLine($"Edge cases:       {edgeCases}");

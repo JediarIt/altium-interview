@@ -46,7 +46,8 @@ public class CapitalLetterBenchmarks
             position = 0;
             foreach (int index in _indexes.AsSpan(start, Batch))
             {
-                slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize).CopyTo(buffer.Slice(position, Dictionary.SlotSize));
+                ReadOnlySpan<byte> slot = slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize);
+                slot.CopyTo(buffer.Slice(position, Dictionary.SlotSize));
                 buffer[position] ^= 0x20;
                 position += lengths[index];
                 buffer[position++] = (byte)' ';
@@ -68,7 +69,8 @@ public class CapitalLetterBenchmarks
             position = 0;
             foreach (int index in _indexes.AsSpan(start, Batch))
             {
-                slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize).CopyTo(buffer.Slice(position, Dictionary.SlotSize));
+                ReadOnlySpan<byte> slot = slots.Slice(index * Dictionary.SlotSize, Dictionary.SlotSize);
+                slot.CopyTo(buffer.Slice(position, Dictionary.SlotSize));
                 Ascii.ToUpperInPlace(buffer.Slice(position, 1), out _);
                 position += lengths[index];
                 buffer[position++] = (byte)' ';

@@ -93,7 +93,9 @@ public class NaiveLineParserTests
         Assert.Equal(21, zeros?.NumberText.Length);
         Assert.Equal((BigInteger)7, zeros?.Number);
         Assert.Equal(40, long40?.NumberText.Length);
-        Assert.Equal(BigInteger.Parse("1234567890123456789012345678901234567890", CultureInfo.InvariantCulture), long40?.Number);
+        const string FortyDigits = "1234567890123456789012345678901234567890";
+        BigInteger expected = BigInteger.Parse(FortyDigits, CultureInfo.InvariantCulture);
+        Assert.Equal(expected, long40?.Number);
     }
 
     [Theory]
@@ -125,7 +127,12 @@ public class NaiveLineParserTests
     [Fact]
     public void Case_and_spaces_are_significant()
     {
-        string[] texts = [Parse("5. Apple")!.TextAsString, Parse("5. apple")!.TextAsString, Parse("5. Apple ")!.TextAsString];
+        string[] texts =
+        [
+            Parse("5. Apple")!.TextAsString,
+            Parse("5. apple")!.TextAsString,
+            Parse("5. Apple ")!.TextAsString,
+        ];
 
         Assert.Equal(3, texts.Distinct(StringComparer.Ordinal).Count());
     }

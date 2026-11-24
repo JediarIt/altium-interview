@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\FileSort.Cli\FileSort.Cli.csproj" />
     <ProjectReference Include="..\FileSort.Common\FileSort.Common.csproj" />
+    <ProjectReference Include="..\FileSort.Engine\FileSort.Engine.csproj" />
     <ProjectReference Include="..\FileSort.Generator\FileSort.Generator.csproj" />
     <ProjectReference Include="..\FileSort.Sorter\FileSort.Sorter.csproj" />
     <ProjectReference Include="..\FileSort.Checker\FileSort.Checker.csproj" />
@@ -35,6 +36,7 @@
     <!-- Tests compare the options table of a program's README with the program's command line. -->
     <None Include="..\FileSort.Generator\README.md" Link="FileSort.Generator.README.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\FileSort.Checker\README.md" Link="FileSort.Checker.README.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\FileSort.Sorter\README.md" Link="FileSort.Sorter.README.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

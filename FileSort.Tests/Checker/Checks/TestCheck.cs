@@ -10,15 +10,21 @@ namespace FileSort.Tests.Checker.Checks;
 internal static class TestCheck
 {
     public static CheckResult Run(
-        byte[] input, byte[] output, LineEnding? lineEnding = null, ScanSettings? settings = null, ScanFeed? feed = null)
+        byte[] input,
+        byte[] output,
+        LineEnding? lineEnding = null,
+        ScanSettings? settings = null,
+        ScanFeed? feed = null)
     {
         using MemoryStream inputStream = new(input, writable: false);
         using MemoryStream outputStream = new(output, writable: false);
-        return PairCheck.Run(
-            inputStream, outputStream, lineEnding, settings ?? ScanSettings.Default, feed ?? new ScanFeed(), CancellationToken.None);
+        settings ??= ScanSettings.Default;
+        feed ??= new ScanFeed();
+        return PairCheck.Run(inputStream, outputStream, lineEnding, settings, feed, CancellationToken.None);
     }
 
-    public static CheckResult Run(string input, string output, LineEnding? lineEnding = null, ScanSettings? settings = null)
+    public static CheckResult Run(
+        string input, string output, LineEnding? lineEnding = null, ScanSettings? settings = null)
     {
         return Run(Encoding.UTF8.GetBytes(input), Encoding.UTF8.GetBytes(output), lineEnding, settings);
     }

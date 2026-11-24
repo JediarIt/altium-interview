@@ -7,8 +7,11 @@ namespace FileSort.Generator.Content;
 /// </summary>
 internal static class ContentFormat
 {
-    /// <summary>The content version, printed in the summary of every run.</summary>
-    public const int Version = 1;
+    /// <summary>
+    /// The content version, printed in the summary of every run. Version 2 added Numbers beyond 64 bits to the
+    /// category big-numbers and the category carriage-return; content without edge cases kept its bytes.
+    /// </summary>
+    public const int Version = 2;
 
     /// <summary>
     /// The capacity of a block in bytes. A file is the concatenation of blocks, each filled with whole lines by its

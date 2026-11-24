@@ -27,7 +27,8 @@ internal static class PipelineExperiment
         sink.AcceptOnlyFromAmong(Discard, ToFile);
         Option<string> file = ExperimentOptions.File(required: false);
         Option<long> size = ExperimentOptions.Size();
-        Option<int[]> threads = ExperimentOptions.Numbers("--threads", "Thread counts, separated by commas.", 1, 2, 4, 8, 16);
+        Option<int[]> threads = ExperimentOptions.Numbers(
+            "--threads", "Thread counts, separated by commas.", 1, 2, 4, 8, 16);
         Option<int[]> capacities = ExperimentOptions.Numbers(
             "--block-capacity", "Block capacities in KiB, separated by commas.", ContentFormat.BlockCapacity / 1024);
         Option<bool> buffered = new("--buffered")
@@ -68,7 +69,8 @@ internal static class PipelineExperiment
         return command;
     }
 
-    private static void Run(string? file, long size, int[] threads, int[] capacities, bool buffered, int runs, TimeSpan pause)
+    private static void Run(
+        string? file, long size, int[] threads, int[] capacities, bool buffered, int runs, TimeSpan pause)
     {
         BlockGenerator generator = new(new ContentOptions { Seed = 1 });
         string target = file is null ? "discarded" : $"{file} ({(buffered ? "buffered" : "unbuffered")})";
@@ -107,7 +109,8 @@ internal static class PipelineExperiment
         try
         {
             using FileSink sink = new(file, OutputSpace.Required(size, generator.MaxLineLength), unbuffered: !buffered);
-            GenerationPipeline.Run(generator, size, threads, sink, CancellationToken.None, blockCapacity: blockCapacity);
+            GenerationPipeline.Run(
+                generator, size, threads, sink, CancellationToken.None, blockCapacity: blockCapacity);
             sink.Commit();
             return stopwatch.Elapsed;
         }

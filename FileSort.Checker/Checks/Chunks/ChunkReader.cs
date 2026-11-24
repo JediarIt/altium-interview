@@ -45,7 +45,8 @@ internal sealed class ChunkReader
     /// <param name="chunkSize">The size of a chunk, as long as no line is longer.</param>
     /// <param name="maxLineLength">The longest line that is read, in bytes without its terminator.</param>
     /// <param name="keepPreviousLine">Put the last line of a chunk in front of the next chunk.</param>
-    public ChunkReader(Stream stream, LineEnding lineEnding, int chunkSize, int maxLineLength, bool keepPreviousLine = false)
+    public ChunkReader(
+        Stream stream, LineEnding lineEnding, int chunkSize, int maxLineLength, bool keepPreviousLine = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkSize);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxLineLength);

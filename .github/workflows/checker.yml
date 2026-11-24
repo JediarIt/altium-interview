@@ -2,8 +2,8 @@ name: Checker
 
 # Builds the solution and runs the tests of the checker with code coverage. It starts when something changes that
 # can affect the checker or its tests: its code, the console library, the tests, the build files, and also the
-# generator, because the tests of the checker make their inputs with it. A commit that touches only documentation
-# or the OpenSpec artifacts does not start it.
+# generator, because the tests of the checker make their inputs with it. A commit that touches only the sorter,
+# documentation or the OpenSpec artifacts does not start it.
 on:
   push:
     branches: [main]
@@ -14,8 +14,6 @@ on:
       - 'FileSort.Common/**'
       - 'FileSort.Benchmarks/**'
       - 'FileSort.Tests/**'
-      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
-      - 'FileSort.Sorter/**'
       - 'FileSort.slnx'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
@@ -25,7 +23,14 @@ on:
       - '.github/workflows/test-program.yml'
       - '.github/workflows/checker.yml'
       - '.github/scripts/**'
-      # Documentation inside the project folders is not code...
+      # The tests of the generator, of the sorter and of its engine are theirs...
+      - '!FileSort.Tests/Generator/**'
+      - '!FileSort.Tests/Sorter/**'
+      - '!FileSort.Tests/Engine/**'
+      # ...apart from the helpers that make the inputs of the checker's tests...
+      - 'FileSort.Tests/Generator/TestContent.cs'
+      - 'FileSort.Tests/Generator/MemorySink.cs'
+      # ...and documentation inside the project folders is not code...
       - '!FileSort.*/**/*.md'
       # ...except the README whose options table a test compares with the command line.
       - 'FileSort.Checker/README.md'
@@ -37,8 +42,6 @@ on:
       - 'FileSort.Common/**'
       - 'FileSort.Benchmarks/**'
       - 'FileSort.Tests/**'
-      # The solution builds the sorter too, and warnings are errors in it. It gets a workflow of its own later.
-      - 'FileSort.Sorter/**'
       - 'FileSort.slnx'
       - 'Directory.Build.props'
       - 'Directory.Packages.props'
@@ -48,7 +51,14 @@ on:
       - '.github/workflows/test-program.yml'
       - '.github/workflows/checker.yml'
       - '.github/scripts/**'
-      # Documentation inside the project folders is not code...
+      # The tests of the generator, of the sorter and of its engine are theirs...
+      - '!FileSort.Tests/Generator/**'
+      - '!FileSort.Tests/Sorter/**'
+      - '!FileSort.Tests/Engine/**'
+      # ...apart from the helpers that make the inputs of the checker's tests...
+      - 'FileSort.Tests/Generator/TestContent.cs'
+      - 'FileSort.Tests/Generator/MemorySink.cs'
+      # ...and documentation inside the project folders is not code...
       - '!FileSort.*/**/*.md'
       # ...except the README whose options table a test compares with the command line.
       - 'FileSort.Checker/README.md'

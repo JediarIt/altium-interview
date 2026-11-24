@@ -10,6 +10,8 @@ public class BlockGeneratorTests
 {
     private const int Capacity = ContentFormat.BlockCapacity;
 
+    private const EdgeCases AllButCarriageReturn = EdgeCases.All & ~EdgeCases.CarriageReturn;
+
     private static byte[] Block(ContentOptions options, long index, int capacity = Capacity)
     {
         byte[] buffer = new byte[capacity];
@@ -74,12 +76,12 @@ public class BlockGeneratorTests
     }
 
     [Fact]
-    public void No_String_contains_a_carriage_return()
+    public void Without_the_category_carriage_return_no_String_contains_one()
     {
         // With \n nothing writes a carriage return at all; with \r\n it occurs only inside terminators.
-        Assert.DoesNotContain((byte)'\r', Block(TestContent.Options(edgeCases: EdgeCases.All), 0));
+        Assert.DoesNotContain((byte)'\r', Block(TestContent.Options(edgeCases: AllButCarriageReturn), 0));
 
-        ContentOptions crlf = TestContent.Options(edgeCases: EdgeCases.All, lineEnding: LineEnding.CrLf);
+        ContentOptions crlf = TestContent.Options(edgeCases: AllButCarriageReturn, lineEnding: LineEnding.CrLf);
         List<NaiveLine> lines = TestContent.Parse(Block(crlf, 0), LineEnding.CrLf);
         Assert.All(lines, line => Assert.DoesNotContain((byte)'\r', line.Text));
     }
@@ -125,16 +127,21 @@ public class BlockGeneratorTests
     // Requirement: Line ending
 
     [Fact]
-    public void Default_line_ending_has_no_carriage_return()
+    public void Default_on_Windows()
     {
-        Assert.Equal(LineEnding.Lf, new ContentOptions { Seed = 1 }.LineEnding);
-        Assert.DoesNotContain((byte)'\r', TestContent.Generate(new ContentOptions { Seed = 1 }, TestContent.Megabyte));
+        ContentOptions options = new() { Seed = 1, EdgeCases = AllButCarriageReturn };
+
+        Assert.Equal(LineEnding.Lf, options.LineEnding);
+        Assert.DoesNotContain((byte)'\r', TestContent.Generate(options, TestContent.Megabyte));
     }
 
-    [Fact]
-    public void Carriage_return_and_line_feed()
+    [Theory]
+    [InlineData((int)EdgeCases.None)]
+    [InlineData((int)AllButCarriageReturn)]
+    public void Carriage_return_and_line_feed(int edgeCases)
     {
-        byte[] content = TestContent.Generate(TestContent.Options(lineEnding: LineEnding.CrLf), TestContent.Megabyte);
+        byte[] content = TestContent.Generate(
+            TestContent.Options(edgeCases: (EdgeCases)edgeCases, lineEnding: LineEnding.CrLf), TestContent.Megabyte);
 
         Assert.True(content.AsSpan().EndsWith("\r\n"u8));
         for (int i = 0; i < content.Length; i++)
@@ -143,8 +150,49 @@ public class BlockGeneratorTests
             {
                 Assert.True(i > 0 && content[i - 1] == '\r', $"A line feed without a carriage return at offset {i}.");
             }
+            else if (content[i] == '\r')
+            {
+                bool lineFeedFollows = i + 1 < content.Length && content[i + 1] == '\n';
+                Assert.True(lineFeedFollows, $"A carriage return without a line feed at offset {i}.");
+            }
         }
+    }
 
-        Assert.Equal(content.AsSpan().Count((byte)'\n'), content.AsSpan().Count((byte)'\r'));
+    [Theory]
+    [InlineData(LineEnding.Lf)]
+    [InlineData(LineEnding.CrLf)]
+    public void Line_ending_of_the_first_line(LineEnding lineEnding)
+    {
+        // Seeds with the category in many lines: whatever the first line rolls, it never ends with a carriage return.
+        for (ulong seed = 1; seed <= 64; seed++)
+        {
+            ContentOptions options = TestContent.Options(
+                seed: seed, edgeCases: EdgeCases.CarriageReturn, lineEnding: lineEnding);
+            byte[] block = Block(options, 0);
+            int firstLineFeed = Array.IndexOf(block, (byte)'\n');
+
+            if (lineEnding == LineEnding.Lf)
+            {
+                Assert.NotEqual((byte)'\r', block[firstLineFeed - 1]);
+            }
+            else
+            {
+                Assert.Equal((byte)'\r', block[firstLineFeed - 1]);
+                Assert.NotEqual((byte)'\r', block[firstLineFeed - 2]);
+            }
+        }
+    }
+
+    [Fact]
+    public void The_first_line_of_another_block_may_end_with_a_carriage_return()
+    {
+        // About one block in 16 rolls a carriage return for its first line, and only the first block drops it.
+        ContentOptions options = TestContent.Options(edgeCases: EdgeCases.CarriageReturn);
+
+        Assert.Contains(Enumerable.Range(1, 1000), index =>
+        {
+            byte[] block = Block(options, index, capacity: 4096);
+            return block[Array.IndexOf(block, (byte)'\n') - 1] == '\r';
+        });
     }
 }

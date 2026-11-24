@@ -10,6 +10,8 @@ namespace FileSort.Tests.Sorter.Cli.Terminal;
 /// <summary>
 /// The bars of the progress, drawn on the error stream of the console of the tests. Spectre.Console is told that the
 /// stream is an interactive terminal, so it draws as it does in a console, and what it wrote is read back as text.
+/// Its own reading of the environment is turned off: on GitHub Actions it would otherwise decide, whatever the
+/// settings say, that the terminal is not interactive, and print lines such as "Chunks: 40%" instead of the bars.
 /// </summary>
 public class BarsProgressViewTests
 {
@@ -115,6 +117,7 @@ public class BarsProgressViewTests
             Ansi = AnsiSupport.Yes,
             Interactive = InteractionSupport.Yes,
             ColorSystem = ColorSystemSupport.NoColors,
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
         }));
     }
 }

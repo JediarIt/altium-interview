@@ -1,7 +1,7 @@
 namespace FileSort.Engine.Runs;
 
 /// <summary>
-/// Where the runs of a sort and its output go (D17 of the design). The sorter keeps runs in files of a temporary
+/// Where the runs of a sort and its output go. The sorter keeps runs in files of a temporary
 /// folder and writes the output under a temporary name; tests and measurements of the processor keep everything in
 /// memory, so that thousands of runs and several merge passes need no disk.
 /// </summary>

@@ -6,12 +6,19 @@ using FileSort.Engine.Runs;
 namespace FileSort.Engine.Merging;
 
 /// <summary>
-/// One merge of D10 of the design: runs merged with a loser tree on one thread into one sorted sequence of lines,
+/// One merge: runs merged with a loser tree on one thread into one sorted sequence of lines,
 /// written to a new run or to the output. The lines are copied as they lie in the runs, terminators included; the
 /// readers parse them again, without the checks they passed when their chunk was made.
 /// </summary>
 internal sealed class RunMerger
 {
+    /// <summary>
+    /// The fewest runs whose heads carry more of the key than their entries. A line meets about log2 of the number
+    /// of runs other lines on its way through the tree, and the key pays from about three such comparisons on: sorts
+    /// in memory showed no difference with 2, 4 and 7 runs, and a merge of 21 runs 30% faster with the key.
+    /// </summary>
+    public const int RunsForHeadsWithKey = 8;
+
     private readonly IRunStorage _storage;
     private readonly ChunkBuffer _buffer;
     private readonly byte[] _output;
@@ -45,10 +52,10 @@ internal sealed class RunMerger
     public long Merge(IReadOnlyList<Run> runs, Stream destination, CancellationToken cancellationToken)
     {
         RunReader[] readers = Readers(runs);
-        LoserTree tree = new(runs.Count, new EntryComparer(_buffer.Bytes));
+        LoserTree<MergeHead, MergeHeadComparer> tree = new(runs.Count, new MergeHeadComparer(_buffer.Bytes));
         for (int source = 0; source < readers.Length; source++)
         {
-            if (readers[source].Next(cancellationToken, out IndexEntry head))
+            if (readers[source].Next(cancellationToken, out MergeHead head))
             {
                 tree.SetHead(source, head);
             }
@@ -83,18 +90,21 @@ internal sealed class RunMerger
     private RunReader[] Readers(IReadOnlyList<Run> runs)
     {
         int slice = (int)Math.Min(_largestRunBuffer, _buffer.Length / runs.Count);
+        bool headsWithKey = runs.Count >= RunsForHeadsWithKey;
         RunReader[] readers = new RunReader[runs.Count];
         for (int source = 0; source < runs.Count; source++)
         {
-            readers[source] = new RunReader(_storage, runs[source], _buffer.Bytes, source * slice, slice, _lineEnding);
+            readers[source] = new RunReader(
+                _storage, runs[source], _buffer.Bytes, source * slice, slice, _lineEnding, headsWithKey);
         }
 
         return readers;
     }
 
-    private static void MoveOn(LoserTree tree, RunReader reader, CancellationToken cancellationToken)
+    private static void MoveOn(
+        LoserTree<MergeHead, MergeHeadComparer> tree, RunReader reader, CancellationToken cancellationToken)
     {
-        if (reader.Next(cancellationToken, out IndexEntry next))
+        if (reader.Next(cancellationToken, out MergeHead next))
         {
             tree.Advance(next);
         }

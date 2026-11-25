@@ -412,7 +412,7 @@ public class PairCheckTests
         Assert.Equal(0, result.Output.Digest.Lines);
     }
 
-    // A scan that ends early, and the other scan (D7)
+    // A scan that ends early, and the other scan
 
     [Fact]
     public void An_invalid_line_in_each_file_is_recorded_for_both_on_every_run()

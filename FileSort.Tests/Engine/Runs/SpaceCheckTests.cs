@@ -3,7 +3,7 @@ using FileSort.Engine.Runs;
 namespace FileSort.Tests.Engine.Runs;
 
 /// <summary>
-/// The free space check of D14 with the free space given by the test: the runs and the output on one volume or on
+/// The free space check with the free space given by the test: the runs and the output on one volume or on
 /// two, the files that the sort replaces, the check before a group of runs, and a volume that cannot be asked.
 /// </summary>
 public class SpaceCheckTests

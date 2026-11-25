@@ -5,7 +5,7 @@ using FileSort.Engine.Lines;
 namespace FileSort.Engine.Chunks;
 
 /// <summary>
-/// The one large array of the sort (D4 and D13 of the design). In the first phase a chunk's lines fill it from the
+/// The one large array of the sort. In the first phase a chunk's lines fill it from the
 /// start and their index entries follow them; in the second phase it is cut into the buffers of the runs that are
 /// merged. It is allocated once, without zeroing, on the heap of pinned objects: its address never changes, so the
 /// alignment of the entries to cache lines, computed from the address, stays true.

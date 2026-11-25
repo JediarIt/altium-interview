@@ -11,7 +11,7 @@ using FileSort.Engine.Runs;
 namespace FileSort.Engine;
 
 /// <summary>
-/// The sort as D3 of the design describes it, on any input and any run storage: the chunks, each read, parsed and
+/// The sort, on any input and any run storage: the chunks, each read, parsed and
 /// sorted on all threads and written as one run, then the merge of the runs into the output. An input that fits in
 /// one chunk is written straight to the output, and an empty input gives an empty output.
 /// </summary>

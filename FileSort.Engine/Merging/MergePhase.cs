@@ -3,7 +3,7 @@ using FileSort.Engine.Runs;
 namespace FileSort.Engine.Merging;
 
 /// <summary>
-/// The second phase of D3 of the design: the runs merged into the output, in one merge when one merge can take them
+/// The second phase of the sort: the runs merged into the output, in one merge when one merge can take them
 /// all, otherwise after merges of groups of the smallest runs into longer runs (see <see cref="MergePlan"/>). Each run
 /// of a group is deleted as soon as the group is merged.
 /// </summary>

@@ -4,7 +4,7 @@ namespace FileSort.Engine.Chunks.Parsing;
 
 /// <summary>
 /// The bytes of a chunk cut into ranges, one per thread, each made of whole lines, and the count of lines of every
-/// range (D4 of the design, "Counting before parsing"). The counts give every range its slice of the index before a
+/// range. The counts give every range its slice of the index before a
 /// line is parsed, and show whether all the entries fit.
 /// </summary>
 internal sealed class LineRanges

@@ -4,7 +4,7 @@ using FileSort.Tests.Generator;
 
 namespace FileSort.Tests.Engine;
 
-/// <summary>The counters of a sort (D17 of the design), as a progress display reads them, and the result.</summary>
+/// <summary>The counters of a sort, as a progress display reads them, and the result.</summary>
 public class SortProgressTests
 {
     [Fact]

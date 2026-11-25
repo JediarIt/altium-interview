@@ -8,7 +8,7 @@ using FileSort.Generator.Content;
 namespace FileSort.Benchmarks.Experiments.Sorter;
 
 /// <summary>
-/// M3 of the design: the whole sort in memory, its two phases timed apart, for several thread counts. The input is
+/// The whole sort in memory, its two phases timed apart, for several thread counts. The input is
 /// default content made by the generator in memory; the runs stay in memory and the output is only counted, so the
 /// disk does not take part.
 /// </summary>
@@ -26,7 +26,7 @@ internal static class SortPhasesExperiment
 
         Command command = new(
             "sort-phases",
-            "M3: the whole sort in memory, the chunks and the merge timed apart, for several thread counts. It writes "
+            "The whole sort in memory, the chunks and the merge timed apart, for several thread counts. It writes "
             + "nothing to the disk.")
         {
             size, memory, threads, runs,

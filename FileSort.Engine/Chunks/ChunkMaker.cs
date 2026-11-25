@@ -8,7 +8,7 @@ using FileSort.Engine.Lines.Parsing;
 namespace FileSort.Engine.Chunks;
 
 /// <summary>
-/// Makes the chunks of the input one after another (the first phase of D3, up to the write): reads the bytes of a
+/// Makes the chunks of the input one after another (the first phase of the sort, up to the write): reads the bytes of a
 /// chunk, cuts them into ranges and counts their lines, parses every range on its own thread, reports the first
 /// problem of the file, and sorts the index in segments.
 /// </summary>

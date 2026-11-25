@@ -2,7 +2,7 @@ using FileSort.Engine.Merging;
 
 namespace FileSort.Tests.Engine.Merging;
 
-/// <summary>The sizes of the groups of runs and the count of merges (D10 of the design, "Passes").</summary>
+/// <summary>The sizes of the groups of runs and the count of merges.</summary>
 public class MergePlanTests
 {
     [Theory]

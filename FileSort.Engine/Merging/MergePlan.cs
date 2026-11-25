@@ -1,7 +1,7 @@
 namespace FileSort.Engine.Merging;
 
 /// <summary>
-/// How many runs one merge takes, and how many merges a sort runs (D10 of the design, "Passes"). One merge takes at
+/// How many runs one merge takes, and how many merges a sort runs. One merge takes at
 /// most as many runs as there are smallest run buffers in the chunk buffer. With more runs, groups of the smallest
 /// runs are merged into longer runs first, each group just large enough that the runs left fit into one final merge:
 /// with k runs and room for F, a group of k - F + 1 runs when that is at most F, otherwise a group of F and the rule

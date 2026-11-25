@@ -101,6 +101,27 @@ public sealed class FileRunStorageTests : IDisposable
     }
 
     [Fact]
+    public void A_complete_output_that_cannot_get_its_name_is_left_under_its_temporary_name()
+    {
+        string output = _directory.File("sorted.txt");
+        FileRunStorage storage = new(output, _directory.Path, overwrite: false);
+        using (Stream stream = storage.CreateOutput())
+        {
+            stream.Write("1. Apple\n"u8);
+        }
+
+        // A file appears at the output path during the final merge, after the last look at it.
+        File.WriteAllText(output, "appeared during the merge");
+
+        IOException e = Assert.Throws<IOException>(storage.CommitOutput);
+        storage.Dispose();
+
+        Assert.Contains("sorted.txt.tmp", e.Message, StringComparison.Ordinal);
+        Assert.Equal("appeared during the merge", File.ReadAllText(output));
+        Assert.Equal("1. Apple\n", File.ReadAllText(_directory.File("sorted.txt.tmp")));
+    }
+
+    [Fact]
     public void An_output_that_cannot_be_written_fails_at_once_with_its_path()
     {
         string output = Path.Combine(_directory.Path, "missing", "sorted.txt");

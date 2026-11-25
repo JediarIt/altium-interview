@@ -5,7 +5,7 @@ using FileSort.Engine.Lines;
 namespace FileSort.Engine.Chunks.Sorting;
 
 /// <summary>
-/// Sorts the index of a chunk the way D7 of the design describes: the entries of every range are sorted by one
+/// Sorts the index of a chunk: the entries of every range are sorted by one
 /// thread, in segments of a bounded size, and the cancellation is looked at between segments. A sort routine cannot
 /// be stopped in the middle, so the size of a segment bounds how long a Ctrl+C waits.
 /// </summary>

@@ -14,7 +14,7 @@ internal sealed class BlockMerger
     private readonly SortedChunk _chunk;
     private readonly BlockPlan _plan;
     private readonly byte[] _terminator;
-    private readonly LoserTree _tree;
+    private readonly LoserTree<IndexEntry, EntryComparer> _tree;
     private readonly int[] _next;
     private readonly int[] _ends;
 
@@ -23,7 +23,7 @@ internal sealed class BlockMerger
         _chunk = chunk;
         _plan = plan;
         _terminator = terminator.ToArray();
-        _tree = new LoserTree(plan.Segments, new EntryComparer(chunk.Buffer.Bytes));
+        _tree = new LoserTree<IndexEntry, EntryComparer>(plan.Segments, new EntryComparer(chunk.Buffer.Bytes));
         _next = new int[plan.Segments];
         _ends = new int[plan.Segments];
     }

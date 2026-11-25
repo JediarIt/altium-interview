@@ -7,7 +7,7 @@ namespace FileSort.Engine.Runs;
 
 /// <summary>
 /// The runs in files of a temporary folder of the sort's own, and the output written as <c>&lt;output&gt;.tmp</c> next
-/// to the output and renamed when it is complete (D14 of the design). The folder is created inside the temporary
+/// to the output and renamed when it is complete. The folder is created inside the temporary
 /// directory when the first run is written, so an input that fits in one chunk gets none, and it is deleted with
 /// everything in it when the storage is disposed, whatever ended the sort. In that directory nothing else is created,
 /// changed or deleted. Every failure is an <see cref="IOException"/> that names the file or the directory it concerns.
@@ -21,7 +21,7 @@ internal sealed class FileRunStorage : IRunStorage, IDisposable
     private readonly Dictionary<int, SafeFileHandle> _readers = [];
     private string? _folder;
     private int _nextId;
-    private bool _committed;
+    private bool _outputComplete;
 
     /// <summary>
     /// Creates the temporary file of the output, empty, so that an output path that cannot be written fails at once
@@ -101,14 +101,29 @@ internal sealed class FileRunStorage : IRunStorage, IDisposable
         return Named(_temporaryOutputPath, "write", () => new NamedFileStream(_temporaryOutputPath, FileMode.Create));
     }
 
+    /// <summary>
+    /// Gives the output its name. From this call on the temporary file is the whole sorted output, so it is never
+    /// deleted: if it cannot be renamed, because a file appeared at the output path during the final merge, it stays
+    /// where it is, and the failure says so. Minutes or hours of sorting are not thrown away for a name.
+    /// </summary>
     public void CommitOutput()
     {
-        Named(_outputPath, "write", () => File.Move(_temporaryOutputPath, _outputPath));
-        _committed = true;
+        _outputComplete = true;
+        try
+        {
+            File.Move(_temporaryOutputPath, _outputPath);
+        }
+        catch (Exception e) when (IsFileSystemFailure(e))
+        {
+            throw new IOException(
+                $"The sorted output is complete, but it could not be named '{_outputPath}': {e.Message} "
+                + $"It was left as '{_temporaryOutputPath}'.",
+                e);
+        }
     }
 
     /// <summary>
-    /// Deletes the temporary folder and, unless the output was committed, its temporary file. Both are tried whatever
+    /// Deletes the temporary folder and, unless the output is complete, its temporary file. Both are tried whatever
     /// happens to the other, and the first failure leaves afterwards.
     /// </summary>
     public void Dispose()
@@ -127,7 +142,7 @@ internal sealed class FileRunStorage : IRunStorage, IDisposable
             failure = Attempt(folder, "delete", () => Directory.Delete(folder, recursive: true));
         }
 
-        if (!_committed)
+        if (!_outputComplete)
         {
             string temporaryOutputPath = _temporaryOutputPath;
             IOException? temporaryFile = Attempt(temporaryOutputPath, "delete", () => File.Delete(temporaryOutputPath));

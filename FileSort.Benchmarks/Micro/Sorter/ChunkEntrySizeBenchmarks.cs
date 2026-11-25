@@ -11,7 +11,7 @@ namespace FileSort.Benchmarks.Micro.Sorter;
 /// <summary>
 /// The sort of the index of a chunk of default content (64 MiB of lines) on 8 threads, as in
 /// <see cref="ChunkSortBenchmarks"/>, with the engine's entry of 16 bytes and with the entry of 24 bytes that also
-/// holds the value of the Number (D6 of the design), both by the routine the engine uses. On one segment the smaller
+/// holds the value of the Number, both by the routine the engine uses. On one segment the smaller
 /// entries may gain only from fitting into the processor's last cache, which eight segments sorted at once do not.
 /// </summary>
 [MemoryDiagnoser]

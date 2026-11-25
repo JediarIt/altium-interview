@@ -10,7 +10,7 @@ using FileSort.Tests.Format;
 namespace FileSort.Tests.Engine.Blocks;
 
 /// <summary>
-/// The write of a chunk by the block merge (D19 of the design, "Blocks"): a line that repeats thousands of times, long
+/// The write of a chunk by the block merge: a line that repeats thousands of times, long
 /// lines that sort next to each other, a large block right after a window full of small ones, and a chunk of one
 /// segment. The run must be the naive sort of the chunk, and the block buffers in flight must never pass the window.
 /// </summary>

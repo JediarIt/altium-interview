@@ -101,6 +101,8 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 - Account for the memory budget explicitly (data buffers, line index, I/O buffers) and verify it via peak working
   set. Choose the GC mode deliberately and measure it.
 - Overlap I/O with CPU work and use all cores for parsing and sorting.
+- Where the sorter does not do one of these yet (it reads, sorts and writes in turns, merges on one thread and runs
+  with the default GC mode), its README lists that among its limitations; the rules stand for the work that follows.
 - Measure, don't guess: BenchmarkDotNet for hot primitives (parse, compare), plus an end-to-end harness that
   reports wall time and peak memory.
 - Disk measurements: files of 1 to 2 GB by default, the 100 GB case once at the end. Leave pauses between runs (an

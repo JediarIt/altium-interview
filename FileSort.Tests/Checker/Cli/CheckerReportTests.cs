@@ -560,7 +560,7 @@ public sealed class CheckerReportTests : IDisposable
             && !line.StartsWith("Peak", StringComparison.Ordinal))];
     }
 
-    // Both scans end early (D7)
+    // Both scans end early
 
     [Fact]
     public void An_invalid_line_in_each_file_is_reported_for_both_the_input_first()
@@ -606,7 +606,7 @@ public sealed class CheckerReportTests : IDisposable
         Assert.Empty(_run.Out);
     }
 
-    // A console that cannot be written to (D8)
+    // A console that cannot be written to
 
     [Fact]
     public void Settings_that_cannot_be_printed_stop_the_check()

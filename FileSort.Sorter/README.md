@@ -155,6 +155,10 @@ never leaves a partial output, and an output that existed before is left as it w
   or the error stream is redirected, that counts as a refusal, and the message names `--overwrite`. A file that
   appears at the output path while the sort runs, when there was none to ask about and no `--overwrite`, is not
   replaced either: the sort ends with exit code 1 before it writes the output.
+- **A complete output is never thrown away.** If a file appears at the output path during the final merge, after
+  that last look, the output cannot get its name. The sort then ends with exit code 1, leaves the file that appeared
+  as it is, and keeps the sorted output under its temporary name, which the message gives: the sort need not be run
+  again, the file can be renamed by hand.
 - **The old output is deleted as late as possible**: once the whole input has been read and checked, right before
   the output is written. A sort that fails earlier, on an invalid line for example, leaves it as it was.
 - **The input cannot be the output.** The same file in `--input` and `--output` is an invalid argument (exit code
@@ -197,7 +201,7 @@ console) and gives the rest to the engine, which allocates two buffers, once, an
 |---|---|---|
 | The window: the block buffers in flight while a chunk is written, then the output buffer of the merge | 32 MiB | 32 MiB |
 | The chunk buffer: the lines and the index entries of a chunk, then the buffers of the runs in the merge | 864 MiB | 96 MiB |
-| Runs one merge takes, at 2 MiB of the chunk buffer each | about 430 | 47 |
+| Runs one merge takes, at two longest lines of the chunk buffer each, a little over 2 MiB | about 430 | 47 |
 
 The chunk buffer is at most the largest array of .NET, about 2 GiB, so more than about 2.2 GB of `--memory` is
 accepted and not used. A file of 1 GB of default content needs about 1.6 GiB for its lines and entries: at the
@@ -382,6 +386,15 @@ not checked again: they were checked when their chunk was made. A loser tree fin
 about log2 of their number comparisons, and the line is copied, with its terminator, to the output buffer, the window
 of the first phase.
 
+The lines that a merge compares are neighbours in the sorted order, and the 8 bytes of String in an entry seldom tell
+such lines apart: of the neighbours in a sorted file of default content, 1 in 100 differs in the first 8 bytes of
+the String, 39 in 100 differ in the next 8, and 58 in 100 have equal Strings. So in a merge of 8 runs or more, the
+current line of a run, its *head*, carries more of its key than an entry does: the first 24 bytes of the String, as
+three numbers, and the value of the Number when it fits in 64 bits. Two heads then compare as numbers, without a
+line being read, unless their Strings are longer than 24 bytes and agree in all 24, their Numbers are above 64 bits,
+or the lines have equal keys. A merge of fewer runs keeps plain entries: making the key costs more than it saves
+there (see [The heads of the merge](#the-heads-of-the-merge)).
+
 Every run gets an equal share of the array, from 2 MiB (two longest lines) up to 16 MiB. One merge therefore takes at
 most as many runs as there are buffers of 2 MiB in the array: about 430 at the default memory, which is about 220 GB
 of input of default content. With more runs, groups of the smallest runs are merged into longer runs first, each group
@@ -398,19 +411,21 @@ The machine these numbers come from, and how far they can be trusted, are descri
 [root README](../README.md#performance). The first sections measure the published sorter on files, and every output
 was checked by the checker; the sections from [The parts in memory](#the-parts-in-memory) on measure the parts of
 the engine in memory, which chose them. The runs on files wrote about 3 GB in all, the one run of 100 GB about
-300 GB more, and the one run of 10 GB about 30 GB.
+300 GB more, the two runs of 10 GB about 50 GB, and the comparison with GNU sort about 8 GB.
 
 ### End to end
 
 The published build, one run of each; the file of 100 GB was sorted by the same assembly from the build output,
-started with `dotnet`, and the file of 10 GB by the build output after the change described in [Memory](#memory-1):
+started with `dotnet`, and the file of 10 GB by the build output of the code as it is now. The file of 100 GB was
+sorted before two changes that came after it, the one described in [Memory](#memory-1) and the wider key in
+[the heads of the merge](#the-heads-of-the-merge): its row is what was measured, not what the code does now.
 
 | Input | `--memory` | Threads | Runs | Merge passes | Chunks | Merge | Whole | Peak working set |
 |---|---|---|---|---|---|---|---|---|
 | 100 MB of default content | 1 GB, the default | 8 | 0 | 0 | 0.92 s | 0.00 s | 0.95 s | 226 MiB |
 | 1 GB of default content | 1 GB, the default | 16, the default | 2 | 1 | 6.88 s | 4.99 s | 11.89 s | 932 MiB |
-| 10 GB of default content | 1 GB, the default | 16, the default | 20 | 1 | 64.70 s | 97.45 s | 162.18 s | 935 MiB |
-| 100 GB of default content | 1 GB, the default | 16, the default | 195 | 1 | 653.04 s | 1495.52 s | 2148.58 s | 1019 MiB |
+| 10 GB of default content | 1 GB, the default | 16, the default | 20 | 1 | 65.77 s | 78.64 s | 144.44 s | 936 MiB |
+| 100 GB of default content, before the two changes | 1 GB, the default | 16, the default | 195 | 1 | 653.04 s | 1495.52 s | 2148.58 s | 1019 MiB |
 
 - **The file of 1 GB**, with default options on the whole machine, sorts in 11.9 s, five times under the minute of
   the task, with a peak working set of 932 MiB: under its 1 GB of `--memory`, and under half of the 2 GB of the
@@ -421,22 +436,27 @@ started with `dotnet`, and the file of 10 GB by the build output after the chang
   12.28 s, so the machine was in its usual state. The input was generated ten minutes before the sort, which left
   the SSD time to empty its fast cache; at this size neither the input nor the runs fit in the file cache of the
   operating system, so they were read from the disk.
-- **The file of 10 GB**, 431 million lines, sorts in 2 min 42 s, with 20 runs and one merge, and the checker found
-  the output correct. It ran once, after the sort of 100 GB, to see the memory after the change described in
-  [Memory](#memory-1) and to put a third point between the other two; a control sort of the file of 1 GB just before
-  it took 11.19 s.
-- **The merge**, on one thread, is 42% of the sort of 1 GB, 60% of the sort of 10 GB and 70% of the sort of 100 GB.
-  It grows faster than the input: per GB the chunks took about the same time in the three sorts (6.9, 6.5 and
-  6.5 s), the merge 5.0 s with 2 runs, 9.7 s with 20 and 15.0 s with 195, where the loser tree makes about eight
-  comparisons a line instead of one. The sort of 1 GB multiplied by 100 would have promised 20 minutes; the sort
-  took 36. A parallel final merge would make it faster; it was not done (see [Limitations](#limitations)).
-- **A sort of 10 GB predicts the sort of 100 GB.** The merge costs a line 116 ns with 2 runs, 226 ns with 20 and
-  347 ns with 195: about 80 ns and about 34 ns more for every level of the loser tree, the logarithm to base 2 of
-  the number of runs. The straight line through the sorts of 1 GB and 10 GB gives 335 ns a line with 195 runs,
-  1444 s for the merge of 100 GB; with the chunks at the rate of the sort of 10 GB, 647 s, that is 34 min 51 s for
-  the whole sort, 3% under the 35 min 49 s measured. With the control sort of 1 GB of the same day in place of the
-  one in the table, the line gives 36 min 16 s, 1% over. So a change to the merge can be measured at 10 GB, with
-  30 GB written, and need not be measured at 100 GB with 300.
+- **The file of 10 GB**, 431 million lines, sorts in 2 min 24 s, with 20 runs and one merge, and the checker found
+  the output correct. It was sorted twice, each time once, after the sort of 100 GB: first to see the memory after
+  the change described in [Memory](#memory-1) and to put a third point between the other two, in 2 min 42 s (the
+  chunks 64.70 s, the merge 97.45 s, a peak of 935 MiB); then with the wider key in the heads of the merge, the row
+  of the table. Control sorts of the file of 1 GB by the same builds took 11.19 s and 11.00 s.
+- **The merge**, on one thread, is 42% of the sort of 1 GB and 70% of the sort of 100 GB. It grows faster than the
+  input: per GB the chunks took about the same time in all the sorts (6.5 to 6.9 s), the merge 5.0 s with 2 runs
+  and 15.0 s with 195, where the loser tree makes about eight comparisons a line instead of one. The sort of 1 GB
+  multiplied by 100 would have promised 20 minutes; the sort took 36. A parallel final merge would make it faster;
+  it was not done (see [Limitations](#limitations)).
+- **A sort of 10 GB predicts the sort of 100 GB.** Before the wider key, the merge cost a line 116 ns with 2 runs,
+  226 ns with 20 and 347 ns with 195: about 80 ns and about 34 ns more for every level of the loser tree, the
+  logarithm to base 2 of the number of runs. The straight line through the sorts of 1 GB and 10 GB gives 335 ns a
+  line with 195 runs, 1444 s for the merge of 100 GB; with the chunks at the rate of the sort of 10 GB, 647 s, that
+  is 34 min 51 s for the whole sort, 3% under the 35 min 49 s measured. With the control sort of 1 GB of the same
+  day in place of the one in the table, the line gives 36 min 16 s, 1% over. So a change to the merge can be
+  measured at 10 GB, with 30 GB written, and need not be measured at 100 GB with 300.
+- **What the wider key does to 100 GB is an estimate.** With it the merge of 10 GB costs a line 183 ns, where it
+  cost 226: 44 ns less, for a key that costs 22 ns to make, so about 15 ns less at each of the 4.3 levels of the
+  tree. At the 7.6 levels of 195 runs that is about 94 ns less of 347, a merge of 100 GB in about 18 minutes where
+  it took 25, and a sort in about 29 minutes where it took 36. The 100 GB were not sorted again.
 - **The file of 100 MB** fits in one chunk at the default memory and is written straight to the output, with no runs
   and no merge. It ran with the process limited to 8 logical processors.
 - The files of 100 MB and 1 GB had been read before, so they may have come from the file cache of the operating
@@ -459,7 +479,7 @@ publish/checker/FileSort.Checker.exe --input data/test-10gb.txt --sorted data/so
 
 # 100 GB, once: about 300 GB written; ten minutes between the generator and the sort let the SSD's cache empty
 FileSort.Generator --output data/test-100gb.txt --size 100GB --seed 1
-publish/sorter/FileSort.Sorter.exe --input data/test-100gb.txt --output data/sorted-100gb.txt
+dotnet FileSort.Sorter/bin/Release/net10.0/FileSort.Sorter.dll --input data/test-100gb.txt --output data/sorted-100gb.txt
 publish/checker/FileSort.Checker.exe --input data/test-100gb.txt --sorted data/sorted-100gb.txt
 ```
 
@@ -468,7 +488,7 @@ publish/checker/FileSort.Checker.exe --input data/test-100gb.txt --sorted data/s
 | Input | `--memory` | Threads | Logical processors | Runs | Peak working set |
 |---|---|---|---|---|---|
 | 1 GB of default content | 1 GB, the default | 16 | 16 | 2 | 932 MiB |
-| 10 GB of default content, after the change below | 1 GB, the default | 16 | 16 | 20 | 935 MiB |
+| 10 GB of default content, after the change below, the first of its two sorts | 1 GB, the default | 16 | 16 | 20 | 935 MiB |
 | 100 GB of default content, before the change below | 1 GB, the default | 16 | 16 | 195 | 1019 MiB |
 | 100 MB of default content | 256 MB, the smallest | 8 | 8 | 2 | 160 MiB |
 | 100 MB of default content | 256 MB | 64, the largest | 2 | 2 | 161 MiB |
@@ -485,17 +505,18 @@ filled: the first chunk reads as many bytes as lines of 25 bytes would fill, and
 What grew was found after the run of 100 GB, and removed. The plan of the blocks of a chunk took its samples into a
 new array for every chunk: 32 segments by 527 blocks at the default memory, about 17,000 samples of 24 bytes, 400 KB.
 An array of 85,000 bytes or more lives on the runtime's heap of large objects, which is freed only by a full
-collection, and a sort that allocates almost nothing never causes one: 195 chunks left about 85 MB of such arrays,
-which is the growth that was measured, 87 MiB. The plan now rents its two large arrays from the shared pool of
-arrays and gives them back, so the next chunk gets the same ones, and a test fails if a chunk after the first
-allocates enough for one array of that heap (501,528 bytes before the change). A sort in memory of 198 chunks of that
-shape, a one-off check that is not part of the repository, left 117 MB on the heap of large objects before the
-change and 33 MB after it, of which 32 are the window. The 100 GB were not sorted again, since that writes 300 GB:
-the peak of 1019 MiB in the tables is the one measured before the change.
+collection, and a sort that allocates almost nothing never causes one. A sort in memory of 198 chunks of that shape,
+a one-off check that is not part of the repository, saw that heap grow by 0.43 MB a chunk, from the 32 MB of the
+window to 117 MB; for the 195 chunks of 100 GB that is 85 MB, and the growth that was measured is 87 MiB. The plan
+now rents its two large arrays, the samples and the bounds of the blocks, from the shared pool of arrays and gives
+them back, so the next chunk gets the same ones; the same check then ends with 33 MB on that heap. A test fails if
+a chunk after the first allocates as much as one array of that heap: it allocated 501,528 bytes before the change,
+the samples, the bounds and the small arrays of a plan together. The 100 GB were not sorted again, since that
+writes 300 GB: the peak of 1019 MiB in the tables is the one measured before the change.
 
 A sort of 10 GB after the change, 20 chunks, shows what to expect of 100 GB. Its peak is 935 MiB, so the rest is
-39 MiB. Its working set, read four times a second by a small program that is not part of the repository, grew from
-the second chunk to the last by 0.06 MiB a chunk, with a standard error of 0.03, and its private bytes by 0.02,
+39 MiB. Its working set, read four times a second by a small program that is not part of the repository, grew over
+18 of its chunks, from the third on, by 0.06 MiB a chunk, with a standard error of 0.03, and its private bytes by 0.02,
 which is no growth; before the change the sorts of 1 GB and 100 GB give 0.45 MiB a chunk. At 0.06 MiB a chunk the
 195 chunks of 100 GB end near 940 MiB, and the merge, whose peak was 5 MiB above the chunks, near 945 MiB, which
 leaves about 80 MiB of the reserve where 5 were left. That is an estimate from 18 points, not a measurement: with
@@ -568,15 +589,56 @@ lines per operation, `ParseBenchmarks`):
 
 | Variant | Mean per line |
 |---|---|
-| Checked: the digits, the separator, the UTF-8 of the String, the entry | 47.4 ns |
-| Already checked, in the merge: the digits and the entry | 19.2 ns |
+| Checked: the digits, the separator, the UTF-8 of the String, the entry | 45.9 ns |
+| Already checked, in the merge: the digits and the entry | 22.6 ns |
+| Already checked, in a merge of 8 runs or more: the entry and the head with its wider key | 44.8 ns |
 
-The check of UTF-8 is most of the difference: the merge skips it, because every line of a run was checked when its
-chunk was made.
+The check of UTF-8 is most of the difference between the first two: the merge skips it, because every line of a run
+was checked when its chunk was made. The wider key of a head costs 22 ns a line: two more reads of 8 bytes of the
+String and the value of the Number.
+
+### The heads of the merge
+
+Whether the heads of a merge should carry more of the key than an entry was measured on the whole sort in memory, by
+the build before the change and the build after it in turns (`sort-phases`, 8 threads, the median of the runs of a
+row; the build before is the commit before the change):
+
+```powershell
+dotnet run -c Release --project FileSort.Benchmarks -- sort-phases --size 780MB --memory 96MB --threads 8
+dotnet run -c Release --project FileSort.Benchmarks -- sort-phases --size 128MB --memory 176MB --threads 8 --runs 5
+
+# 4 and 7 runs: the same with --memory 96MB and --memory 64MB
+```
+
+| Runs merged | Merge with entries as heads | Merge with the wider key in every head |
+|---|---|---|
+| 2 (128 MiB of content) | 0.38 and 0.43 s | 0.46 and 0.43 s |
+| 4 (128 MiB) | 0.51 and 0.56 s | 0.63 and 0.52 s |
+| 7 (128 MiB) | 0.71 and 0.70 s | 0.69 and 0.57 s |
+| 21 (780 MiB), a first series | 6.09 s | 4.34 and 4.29 s |
+| 21 (780 MiB), a second series | 6.86 and 6.52 s | 5.08 and 5.42 s |
+
+With 21 runs the merge is 20% to 30% faster; with 2, 4 and 7 runs the two are the same within the noise of the
+machine, and with 2 runs the key can only lose: it costs 22 ns to make and saves about 15 ns in a comparison, and a
+line of a merge of 2 runs is compared once. So the key is made in merges of 8 runs or more, where a line meets three
+others or more on its way through the tree; with fewer runs the heads are plain entries, and a merge of 2 runs, which
+is what a sort of 1 GB at the default memory makes, does what it did before: the merge of the first row took 0.38 and
+0.38 s by the build before and 0.36 and 0.38 s by the final one, in turns.
+
+The same heads were tried in the merge of the blocks of a chunk, where the lines lie in memory, and taken out again:
+the write of a chunk of 64 MiB took 605 ms on one thread where it had taken 455, and 207 ms on eight where it had
+taken 153 (`block-merge --threads 1,8 --blocks 1024`). There the comparison that reads the lines is cheap, because
+the lines of a block lie close to each other, and the key does not pay for itself. The loser tree is therefore
+written once for both kinds of head and compiled for each.
+
+Where the neighbours of a sorted file differ, counted on three slices of 30 MB of the sorted file of 1 GB of default
+content by a small program that is not part of the repository: 0.9% in the first 8 bytes of the String, 39.1% in the
+next 8, 2.1% in the 8 after those, none later; 57.8% have equal Strings, of 24 bytes or less in 50.7% of all pairs
+and longer in 7.1%. A key of 24 bytes and the Number therefore decide 93% of such pairs without reading a line.
 
 ### The sort routine
 
-A chunk is sorted by every thread in its own range, in segments (D7 of the design). Three routines were measured on
+A chunk is sorted by every thread in its own range, in segments. Three routines were measured on
 the index of a chunk of 64 MiB of lines, 8 threads, segments of 2^20 entries (`ChunkSortBenchmarks`):
 
 | Routine | Mean |
@@ -626,7 +688,7 @@ fifth more lines: a line of default content takes 25 bytes and its entry 16 inst
 ### The size of a block
 
 The write of one sorted chunk of 64 MiB of default content by the block merge, in memory, to a stream that keeps
-nothing (M2 of the design; three runs a row, the median):
+nothing (three runs a row, the median):
 
 ```powershell
 dotnet run -c Release --project FileSort.Benchmarks -- block-merge
@@ -650,7 +712,7 @@ that the eight threads had.
 ### The phases
 
 The whole sort in memory: 128 MiB of default content, 64 MiB for the engine's buffers, which makes 7 runs merged in
-one pass; the runs stay in memory, and the output is only counted (M3 of the design; three runs a row, the median):
+one pass; the runs stay in memory, and the output is only counted (three runs a row, the median):
 
 ```powershell
 dotnet run -c Release --project FileSort.Benchmarks -- sort-phases
@@ -669,7 +731,9 @@ time whatever the threads, about 140 ns a line with 7 runs. With 8 threads the m
 ## Design decisions
 
 Decisions about the whole solution are in the [root README](../README.md#design-decisions); these are the ones of
-the sorter.
+the sorter. The design that was written before the code, with the alternatives it weighed and the measurements of
+its planning, is kept with the change that added the sorter:
+[design.md](../openspec/changes/archive/2026-11-24-add-external-sorter/design.md).
 
 - **The engine is a library, the program a thin host.** `FileSort.Engine` sorts a file and has no console code:
   settings in, a result out, and progress as counters that the host reads from its own thread. A test checks that
@@ -694,6 +758,12 @@ the sorter.
 - **A loser tree for the merge**: it finds the least of k lines with about log2 k comparisons, one per level on the
   way from the leaf of the last winner to the root. A binary heap, such as `PriorityQueue`, compares two children at
   every level on the way down, about twice as many.
+- **A wider key in the heads of a merge of 8 runs or more.** The lines that a merge compares are neighbours in the
+  sorted order, which the 8 bytes of String in an entry seldom tell apart, so a head carries 24 bytes of the String
+  and the value of the Number. An entry of the index has no room for that, with one entry for every line of a
+  chunk; a merge has one head for every run. Measured: a merge of 21 runs is 20% to 30% faster, a sort of 10 GB 11%;
+  merges of fewer than 8 runs, and the merge of the blocks of a chunk, keep plain entries, because there the key
+  costs more than it saves (see [The heads of the merge](#the-heads-of-the-merge)).
 - **Equal keys in the order of their bytes**, so that the output depends only on the input (see
   [What the output holds](#what-the-output-holds)).
 - **`--memory` limits the whole process**, because the memory of a process is what anyone watching it sees; the
@@ -736,7 +806,9 @@ the sorter.
   must never pass the window. A chunk after the first, of the shape of a chunk at the default memory, must allocate
   less than one array of the heap of large objects (see [Memory](#memory-1)).
 - **Merge**: many runs with tiny buffers; exactly as many runs as one merge takes, and one more; several passes; after
-  every group only the runs that the plan keeps are left.
+  every group only the runs that the plan keeps are left. The heads of a merge, with their wider key and without it,
+  must compare every pair of lines as the entries do, on lines written by hand around 8, 16 and 24 bytes of String
+  and around 64 bits of Number, on generated lines with every edge case, and on the neighbours of their sorted order.
 - **The whole sort in memory**: generated input with every edge case, 1, 2, 7 and 16 threads, chunk buffers from the
   smallest to one that holds the whole input, both line endings: the output must be the naive sort byte for byte.
 - **Files**: the temporary folder appears with the first run and disappears with the sort; files of the user next to
@@ -748,6 +820,37 @@ the sorter.
 - **Disk**: the cases with thousands of runs and several passes run on a run storage in memory, so the tests write
   megabytes.
 - The code coverage of the solution is in the [root README](../README.md#code-coverage).
+
+### GNU sort as an oracle from outside
+
+GNU sort, told where the fields are, orders these files the way the sorter does:
+
+```bash
+LC_ALL=C sort -t. -k2 -k1,1n -S 1G --parallel=16 -T data data/check-default-1gb.txt > data/gnu-sorted.txt
+cmp data/sorted.txt data/gnu-sorted.txt
+```
+
+With `-t.` the first period ends the first field, `-k2` compares everything after it as bytes (`LC_ALL=C`), which
+is the String with the space before it, `-k1,1n` then compares the Number as a number of any length, and for lines
+that are still equal GNU sort falls back on the bytes of the whole lines, the sorter's order of lines with equal
+keys. It shares nothing with this solution, not even the language, so a byte-for-byte equal output is evidence from
+outside. The outputs of the sorter and of GNU sort 8.32 were the same, byte for byte, for six files:
+
+| File | Lines | The sorter, default options | GNU sort |
+|---|---|---|---|
+| 1 GB of default content | 43.1 million | 11.00 s | 40.2 s |
+| 1 GB with edge cases and `\r\n`, the one of the checker's measurements | 41.2 million | 11.37 s | 38.5 s |
+| 30 MB of default content | 1.26 million | | |
+| 30 MB with every edge case of content version 2 | 1.25 million | | |
+| 30 MB of five Strings with random Numbers and `\r\n` | 1.26 million | | |
+| 30 MB of random Strings of printable ASCII, 1 to 100 bytes | 0.43 million | | |
+
+One run of each; the files of 30 MB were not timed. The GNU sort is the one that comes with Git for Windows, which
+reads and writes files through a layer that imitates POSIX, so the times say more about the agreement than about
+the speed of GNU sort elsewhere. With `\r\n`, GNU sort takes the carriage return for the last byte of the String,
+which gives the sorter's order unless one String is the beginning of another that goes on with a byte below a
+carriage return, a control character; none of these files has such a pair. The comparison is not a test of the
+repository: it needs GNU sort, and files of a size that tests do not write.
 
 ### Mutations
 
@@ -769,13 +872,27 @@ and the fault was taken out again. Every fault made tests fail:
 | The next chunk started one byte late | the reading of chunks | 36, among them `ChunkBoundaryTests.A_chunk_ends_after_every_line_for_some_size_of_the_buffer` |
 | The loser tree keeping the wrong winner | the loser tree | 71, among them `ReadingTests.Carriage_return_and_line_feed` |
 
+Five more faults went into the heads of the merge and their comparison when the wider key was added, the same way:
+
+| Fault | Tests that failed |
+|---|---|
+| The second part of the key compared the wrong way round | 12, among them `MergeHeadComparerTests.Every_pair_of_hand_written_lines_compares_as_their_entries_do` |
+| Strings of equal length taken for equal beyond the 24 bytes of the key | 2, the same test and `MergeHeadComparerTests.Generated_lines_compare_as_their_entries_do` |
+| The third part of the key read from the bytes of the second | 5, among them `MergeHeadComparerTests.Generated_lines_compare_as_their_entries_do` |
+| A Number above 64 bits taken as fitting | 9, among them `MergeHeadComparerTests.Every_pair_of_hand_written_lines_compares_as_their_entries_do` |
+| The Numbers of the heads compared the wrong way round | 7, among them `MergeHeadComparerTests.Generated_lines_compare_as_their_entries_do` |
+
 ## Limitations
 
-- **The merge runs on one thread.** It is 70% of the sort of 100 GB, and with eight threads already half of a sort
-  in memory (see [The phases](#the-phases)). A parallel final merge, by ranges of keys as in the block merge, would
-  make it faster; it was not done.
+- **The merge runs on one thread.** It was 70% of the sort of 100 GB, is 54% of the sort of 10 GB with the wider
+  key, and with eight threads already half of a sort in memory (see [The phases](#the-phases)). A parallel final
+  merge, by ranges of keys as in the block merge, would make it faster; it was not done.
 - **Reading, sorting and writing take turns**: while a chunk is sorted, the disk waits, and while it is read or
-  written, the processor mostly does.
+  written, the processor mostly does. The merge reads its runs and writes its output on the thread that merges; on
+  an SSD it waits for the processor, not for the disk, but on a hard disk a thread of its own for the writing would
+  matter. It was not done: there was no hard disk to measure it on.
+- **The index of a chunk is sorted by comparisons.** A radix sort by the prefix, before the comparisons, is a known
+  way to sort such an index faster; it was not tried.
 - **A line is at most 1 MiB**, its terminator not counted.
 - **A process that is killed leaves its temporary folder**, `<output>.sort-` and a random suffix, and maybe
   `<output>.tmp`; they can be deleted by hand. So does a sort whose folder another program holds open when it ends,
@@ -786,7 +903,12 @@ and the fault was taken out again. Every fault made tests fail:
   input's own name in a way the comparison of full paths misses, through a network share for example, makes the
   sort write in place, and a failure or a Ctrl+C during the final merge would then lose the input.
 - **100 GB was sorted once, and nothing larger.** Its peak working set came within 5 MiB of `--memory`; the cause
-  was removed afterwards (see [Memory](#memory-1)), and the 100 GB were not sorted again: a sort of 10 GB puts
-  their peak near 945 MiB, as an estimate. Whether a much larger input stays under `--memory` was not measured.
-- **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
-  machine.
+  was removed afterwards (see [Memory](#memory-1)), then the merge got a wider key (see
+  [The heads of the merge](#the-heads-of-the-merge)), and the 100 GB were not sorted again: sorts of 10 GB put their
+  peak near 945 MiB and their time near 29 minutes, as estimates. Whether a much larger input stays under `--memory`
+  was not measured.
+- **Windows-only measurements.** The code is cross-platform, but it was developed, tested and measured on one
+  Windows machine, and continuous integration runs on Windows; it was never run on Linux or macOS. One difference is
+  known: outside Windows the check of free space takes the temporary folder and the output for two volumes, so on
+  one volume it asks for the size of the input where the sort needs twice that, and a sort that does not fit ends
+  with exit code 1 when the disk is full, not before the input is read.

@@ -16,14 +16,14 @@ public class LoserTreeTests
             starts[source + 1] = starts[source] + sources[source].Length;
         }
 
-        LoserTree tree = new(sources.Length, lines.Comparer);
+        LoserTree<MergeHead, MergeHeadComparer> tree = new(sources.Length, lines.HeadComparer);
         int[] next = new int[sources.Length];
         for (int source = 0; source < sources.Length; source++)
         {
             next[source] = starts[source];
             if (sources[source].Length > 0)
             {
-                tree.SetHead(source, lines.Entries[next[source]]);
+                tree.SetHead(source, lines.HeadOf(lines.Entries[next[source]]));
             }
             else
             {
@@ -36,10 +36,10 @@ public class LoserTreeTests
         while (!tree.Done)
         {
             int winner = tree.Winner;
-            merged.Add(lines.TextOf(tree.WinnerHead));
+            merged.Add(lines.TextOf(tree.WinnerHead.Entry));
             if (++next[winner] < starts[winner + 1])
             {
-                tree.Advance(lines.Entries[next[winner]]);
+                tree.Advance(lines.HeadOf(lines.Entries[next[winner]]));
             }
             else
             {

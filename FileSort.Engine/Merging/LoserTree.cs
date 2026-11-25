@@ -6,28 +6,32 @@ namespace FileSort.Engine.Merging;
 /// A tournament of sorted sources that finds the least of their current lines with about log2(k) comparisons for k
 /// sources: each inner node keeps the loser of the match played there, so when the winner's source moves on, only
 /// the matches on the path from that source to the top are played again. A binary heap needs about twice as many
-/// comparisons. The current line of each source is its head, an index entry whose line lies in the buffer of the
-/// comparer.
+/// comparisons. The current line of each source is its head: an index entry in the merge of the blocks of a chunk, or
+/// a <see cref="MergeHead"/>, which carries more of the key, in the merge of runs.
 /// </summary>
 /// <remarks>
 /// The k sources are the leaves of a binary tree laid out in an array, as in a heap: the inner nodes are 1 to k - 1,
 /// node n has the children 2n and 2n + 1, and the leaf of source i stands at k + i. Node 0 holds the winner of the
 /// whole tournament. A source that has no more lines loses every match.
 /// </remarks>
-internal sealed class LoserTree
+/// <typeparam name="THead">What stands for the current line of a source.</typeparam>
+/// <typeparam name="TOrder">The order of those lines.</typeparam>
+internal sealed class LoserTree<THead, TOrder>
+    where THead : struct
+    where TOrder : struct, ILineOrder<THead>
 {
     private readonly int[] _nodes;
-    private readonly IndexEntry[] _heads;
+    private readonly THead[] _heads;
     private readonly bool[] _exhausted;
-    private readonly EntryComparer _comparer;
+    private readonly TOrder _order;
 
-    public LoserTree(int sources, EntryComparer comparer)
+    public LoserTree(int sources, TOrder order)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sources, 1);
         _nodes = new int[sources];
-        _heads = new IndexEntry[sources];
+        _heads = new THead[sources];
         _exhausted = new bool[sources];
-        _comparer = comparer;
+        _order = order;
     }
 
     public int Sources => _heads.Length;
@@ -36,13 +40,13 @@ internal sealed class LoserTree
     public int Winner => _nodes[0];
 
     /// <summary>The head of the winner: the next line in the merged order.</summary>
-    public ref readonly IndexEntry WinnerHead => ref _heads[_nodes[0]];
+    public ref readonly THead WinnerHead => ref _heads[_nodes[0]];
 
     /// <summary>Every source has run out: the winner itself has no head.</summary>
     public bool Done => _exhausted[_nodes[0]];
 
     /// <summary>Sets the first head of a source before <see cref="Start"/>.</summary>
-    public void SetHead(int source, in IndexEntry head)
+    public void SetHead(int source, in THead head)
     {
         _heads[source] = head;
         _exhausted[source] = false;
@@ -61,7 +65,7 @@ internal sealed class LoserTree
     }
 
     /// <summary>The winner's source moves on to its next head; the matches on its path are played again.</summary>
-    public void Advance(in IndexEntry next)
+    public void Advance(in THead next)
     {
         int winner = _nodes[0];
         _heads[winner] = next;
@@ -120,6 +124,6 @@ internal sealed class LoserTree
             return false;
         }
 
-        return _exhausted[y] || _comparer.Compare(in _heads[x], in _heads[y]) < 0;
+        return _exhausted[y] || _order.Compare(in _heads[x], in _heads[y]) < 0;
     }
 }

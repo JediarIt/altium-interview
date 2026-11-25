@@ -8,7 +8,7 @@ using FileSort.Tests.Format;
 namespace FileSort.Tests.Engine.Chunks;
 
 /// <summary>
-/// Chunk and range boundaries at every line of a small input (D19 of the design, "Chunks"): tiny chunk buffers of every
+/// Chunk and range boundaries at every line of a small input: tiny chunk buffers of every
 /// size from the smallest up, and 1, 2, 7 and 16 threads, which cut the input and its chunks in every place. The
 /// output must be the naive sort every time, and an invalid line must be reported with the number and the offset that
 /// the naive parser gives it.

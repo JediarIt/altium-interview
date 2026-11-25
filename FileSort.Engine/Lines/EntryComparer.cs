@@ -23,7 +23,7 @@ namespace FileSort.Engine.Lines;
 /// <c>07. Apple</c>, <c>7. Apple</c>. Since the Strings are equal, that is the order of the bytes of the lines.</item>
 /// </list>
 /// </remarks>
-internal readonly struct EntryComparer(byte[] lines) : IComparer<IndexEntry>
+internal readonly struct EntryComparer(byte[] lines) : IComparer<IndexEntry>, ILineOrder<IndexEntry>
 {
     private readonly byte[] _lines = lines;
 
@@ -53,8 +53,8 @@ internal readonly struct EntryComparer(byte[] lines) : IComparer<IndexEntry>
     {
         ReadOnlySpan<byte> xLine = Line(in x);
         ReadOnlySpan<byte> yLine = Line(in y);
-        int xDigits = NumberLength(in x, xLine);
-        int yDigits = NumberLength(in y, yLine);
+        int xDigits = x.NumberLength(xLine);
+        int yDigits = y.NumberLength(yLine);
 
         ReadOnlySpan<byte> xString = xLine[(xDigits + LineFormat.SeparatorLength)..];
         ReadOnlySpan<byte> yString = yLine[(yDigits + LineFormat.SeparatorLength)..];
@@ -90,12 +90,5 @@ internal readonly struct EntryComparer(byte[] lines) : IComparer<IndexEntry>
     private ReadOnlySpan<byte> Line(in IndexEntry entry)
     {
         return _lines.AsSpan((int)entry.Offset, entry.LineLength);
-    }
-
-    // The count of digits that the entry stores, or, for a Number of 1023 digits or more, the count read again.
-    private static int NumberLength(in IndexEntry entry, ReadOnlySpan<byte> line)
-    {
-        int stored = EntryShape.StoredNumberLength(entry.Shape);
-        return stored < EntryShape.SaturatedNumberLength ? stored : LineParser.CountDigits(line);
     }
 }

@@ -3,7 +3,7 @@ namespace FileSort.Engine.Chunks.Parsing;
 /// <summary>
 /// Where the index entries of a chunk go: right after its lines, from the first cache line that starts there, one
 /// slice per range. Every slice starts on a cache line, so that two threads that fill or sort their slices never
-/// write to one cache line (D7 of the design).
+/// write to one cache line.
 /// </summary>
 internal sealed class IndexLayout
 {

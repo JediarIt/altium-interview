@@ -9,7 +9,7 @@ namespace FileSort.Benchmarks.Micro.Sorter;
 /// The sort of the index of a chunk of default content, as the engine sorts it: the entries are cut into one range per
 /// thread, and every thread sorts its range in segments of 2^20 entries. The chunk has 64 MiB of lines and 8 threads
 /// sort it, so that a run of the benchmark keeps half of the processors free; a chunk of the default memory holds
-/// about 510 MiB. The rule of D7 of the design: the hand-written routine is used only if it sorts a chunk at least
+/// about 510 MiB. The rule of the design: the hand-written routine is used only if it sorts a chunk at least
 /// 10% faster than the framework.
 /// </summary>
 [MemoryDiagnoser]

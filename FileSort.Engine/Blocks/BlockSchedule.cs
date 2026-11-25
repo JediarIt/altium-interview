@@ -1,10 +1,10 @@
 namespace FileSort.Engine.Blocks;
 
 /// <summary>
-/// The order in which the blocks of a chunk start and are written (D8 of the design, "Bounded memory, no waiting in a
-/// circle"). Blocks start strictly in order: block b starts only after block b - 1 has started, and only when its
-/// exact size fits in what the window has left. One writer writes them in order and frees the window as it goes.
-/// Every block before a waiting one has started and will finish, so room always comes.
+/// The order in which the blocks of a chunk start and are written, so that their buffers stay within the window and
+/// no thread waits for another in a circle. Blocks start strictly in order: block b starts only after block b - 1 has
+/// started, and only when its exact size fits in what the window has left. One writer writes them in order and frees
+/// the window as it goes. Every block before a waiting one has started and will finish, so room always comes.
 /// </summary>
 /// <remarks>
 /// A block larger than a quarter of the window gets no buffer: it starts only when it is the next block to be

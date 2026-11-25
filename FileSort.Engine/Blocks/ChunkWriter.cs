@@ -7,7 +7,7 @@ namespace FileSort.Engine.Blocks;
 
 /// <summary>
 /// Writes a sorted chunk as one sorted sequence of lines: its blocks are merged by worker threads at the same time and
-/// written in order by one writer thread (D8 of the design). Merging the segments on one thread would cost more than
+/// written in order by one writer thread. Merging the segments on one thread would cost more than
 /// all the rest of the work on the chunk.
 /// </summary>
 /// <param name="window">The window of the block buffers.</param>

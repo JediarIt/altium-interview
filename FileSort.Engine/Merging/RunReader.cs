@@ -6,10 +6,10 @@ using FileSort.Engine.Runs;
 namespace FileSort.Engine.Merging;
 
 /// <summary>
-/// Reads a run line by line through a buffer of its own, a slice of the chunk buffer (D10 of the design). The current
-/// line is parsed into an index entry whose offset points into the chunk buffer, so lines of different runs compare
-/// with one comparer. When the next line is not whole in the buffer, the rest of the buffer moves to its start and
-/// the next bytes of the run are read after it.
+/// Reads a run line by line through a buffer of its own, a slice of the chunk buffer. The current
+/// line is parsed into a head of the merge, whose entry points into the chunk buffer, so lines of different runs
+/// compare with one comparer. When the next line is not whole in the buffer, the rest of the buffer moves to its
+/// start and the next bytes of the run are read after it.
 /// </summary>
 internal sealed class RunReader
 {
@@ -19,6 +19,7 @@ internal sealed class RunReader
     private readonly int _start;
     private readonly int _capacity;
     private readonly bool _carriageReturn;
+    private readonly bool _headsWithKey;
     private long _runPosition;
     private int _filled;
     private int _lineStart;
@@ -30,7 +31,16 @@ internal sealed class RunReader
     /// <param name="start">Where the slice of this reader starts.</param>
     /// <param name="capacity">The bytes of the slice: at least a longest line with its terminator.</param>
     /// <param name="lineEnding">The line ending of the lines of the run.</param>
-    public RunReader(IRunStorage storage, Run run, byte[] buffer, int start, int capacity, LineEnding lineEnding)
+    /// <param name="headsWithKey">Whether the heads carry more of the key than their entries: see
+    /// <see cref="MergeHead.WithoutKey"/>.</param>
+    public RunReader(
+        IRunStorage storage,
+        Run run,
+        byte[] buffer,
+        int start,
+        int capacity,
+        LineEnding lineEnding,
+        bool headsWithKey)
     {
         _storage = storage;
         _run = run;
@@ -38,6 +48,7 @@ internal sealed class RunReader
         _start = start;
         _capacity = capacity;
         _carriageReturn = lineEnding == LineEnding.CrLf;
+        _headsWithKey = headsWithKey;
         _filled = start;
         _lineStart = start;
         _lineEnd = start;
@@ -46,8 +57,8 @@ internal sealed class RunReader
     /// <summary>The current line with its terminator, as it will be written.</summary>
     public ReadOnlySpan<byte> Line => _buffer.AsSpan(_lineStart, _lineEnd - _lineStart);
 
-    /// <summary>Moves to the next line and gives its entry; false at the end of the run.</summary>
-    public bool Next(CancellationToken cancellationToken, out IndexEntry entry)
+    /// <summary>Moves to the next line and gives its head for the merge; false at the end of the run.</summary>
+    public bool Next(CancellationToken cancellationToken, out MergeHead head)
     {
         _lineStart = _lineEnd;
         int lineFeed = _buffer.AsSpan(_lineStart, _filled - _lineStart).IndexOf(LineFormat.LineFeed);
@@ -60,13 +71,15 @@ internal sealed class RunReader
 
         if (lineFeed < 0)
         {
-            entry = default;
+            head = default;
             return EndOfRun();
         }
 
         _lineEnd = _lineStart + lineFeed + 1;
         int contentLength = _carriageReturn ? lineFeed - 1 : lineFeed;
-        entry = LineParser.ParseValid(_buffer.AsSpan(_lineStart, contentLength), (uint)_lineStart);
+        ReadOnlySpan<byte> line = _buffer.AsSpan(_lineStart, contentLength);
+        IndexEntry entry = LineParser.ParseValid(line, (uint)_lineStart);
+        head = _headsWithKey ? new MergeHead(in entry, line) : MergeHead.WithoutKey(in entry);
         return true;
     }
 

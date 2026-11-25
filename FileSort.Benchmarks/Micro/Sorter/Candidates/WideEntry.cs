@@ -5,7 +5,7 @@ using FileSort.Engine.Lines;
 namespace FileSort.Benchmarks.Micro.Sorter.Candidates;
 
 /// <summary>
-/// An index entry of 24 bytes, the entry that D6 of the design planned and M1 measured against the engine's entry of
+/// An index entry of 24 bytes, the entry that the design planned and a benchmark measured against the engine's entry of
 /// 16 bytes: the prefix of the String, the value of the Number when it fits in 64 bits, the offset and the shape. Lines
 /// with equal Strings compare their Numbers as integers when both fit, without reading the digits.
 /// </summary>

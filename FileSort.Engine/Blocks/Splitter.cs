@@ -5,8 +5,7 @@ namespace FileSort.Engine.Blocks;
 /// <summary>
 /// An entry of a sorted segment together with where it stands: the number of the segment and its index in the sorted
 /// segment. Two such keys compare by the order of lines first, then by the segment, then by the index: a strict order,
-/// in which no two entries of a chunk are equal, so that lines with one key can be split between blocks (D8 of the
-/// design, "Repeated lines").
+/// in which no two entries of a chunk are equal, so that lines with one key can be split between blocks.
 /// </summary>
 internal readonly record struct Splitter(IndexEntry Entry, int Segment, int Index)
 {

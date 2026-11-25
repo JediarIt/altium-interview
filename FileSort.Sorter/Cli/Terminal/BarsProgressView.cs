@@ -8,7 +8,7 @@ using Spectre.Console;
 namespace FileSort.Sorter.Cli.Terminal;
 
 /// <summary>
-/// The progress of a sort drawn with Spectre.Console on the error stream of a console (D15 of the design): a bar for
+/// The progress of a sort drawn with Spectre.Console on the error stream of a console: a bar for
 /// the chunks over the bytes of the input read, with the runs written so far, and a bar for each merge pass over the
 /// bytes it writes, each with its throughput and the time left. The counters of the engine are read, and the bars
 /// drawn, every 100 ms on the thread that follows the sort, so a console that cannot be written to fails there.

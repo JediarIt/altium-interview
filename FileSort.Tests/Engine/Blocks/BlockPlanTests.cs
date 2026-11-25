@@ -8,7 +8,7 @@ using FileSort.Tests.Engine.Chunks;
 namespace FileSort.Tests.Engine.Blocks;
 
 /// <summary>
-/// The splitting of a chunk into blocks (D8 of the design): blocks in order, of about equal size, also when one key
+/// The splitting of a chunk into blocks: blocks in order, of about equal size, also when one key
 /// fills most of the chunk, and sizes summed from the lengths in the entries.
 /// </summary>
 public class BlockPlanTests

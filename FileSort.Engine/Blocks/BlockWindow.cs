@@ -1,7 +1,7 @@
 namespace FileSort.Engine.Blocks;
 
 /// <summary>
-/// The window of D8 and D13 of the design: one array, allocated once, for the merged blocks that wait to be written.
+/// The window of the block merge: one array, allocated once, for the merged blocks that wait to be written.
 /// Its end is set aside as the piece buffer of a large block, which its worker writes piece by piece; the rest holds
 /// the buffers of ordinary blocks, used as a ring: blocks start in order and are written in order, so the oldest
 /// buffer is always the next one to be freed. In the merge phase the whole array is the output buffer.

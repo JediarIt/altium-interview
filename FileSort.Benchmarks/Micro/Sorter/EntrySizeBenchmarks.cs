@@ -10,7 +10,7 @@ namespace FileSort.Benchmarks.Micro.Sorter;
 
 /// <summary>
 /// The sort of one segment of 2^20 entries of default content on one core, with the engine's entry of 16 bytes and
-/// with the entry of 24 bytes that also holds the value of the Number (D6 of the design). Both are sorted by the
+/// with the entry of 24 bytes that also holds the value of the Number. Both are sorted by the
 /// routine the engine uses, the framework's sort of elements that compare themselves.
 /// </summary>
 [MemoryDiagnoser]

@@ -2,7 +2,7 @@ using FileSort.Common;
 
 namespace FileSort.Engine;
 
-/// <summary>What a sort that finished did (D17 of the design).</summary>
+/// <summary>What a sort that finished did.</summary>
 public sealed record SortResult
 {
     /// <summary>The lines of the input, and of the output.</summary>

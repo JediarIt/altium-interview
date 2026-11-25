@@ -1,11 +1,11 @@
 namespace FileSort.Engine.Runs;
 
 /// <summary>
-/// Checks that the volumes of the temporary folder and of the output have the free space that the sort needs (D14 of
-/// the design): before the input is read, room for runs of about the input's size and for the output of the same
-/// size, the sum of the two on one volume; and before every merge of a group of runs, room for the run it writes,
-/// which the first check could not foresee, since the number of passes depends on the length of the lines. A volume
-/// whose free space cannot be asked is not checked.
+/// Checks that the volumes of the temporary folder and of the output have the free space that the sort needs: before
+/// the input is read, room for runs of about the input's size and for the output of the same size, the sum of the two
+/// on one volume; and before every merge of a group of runs, room for the run it writes, which the first check could
+/// not foresee, since the number of passes depends on the length of the lines. A volume whose free space cannot be
+/// asked is not checked.
 /// </summary>
 /// <param name="tempDirectory">The directory in which the temporary folder is created.</param>
 /// <param name="outputPath">The full path of the output.</param>

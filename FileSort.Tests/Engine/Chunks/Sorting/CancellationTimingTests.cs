@@ -9,7 +9,7 @@ namespace FileSort.Tests.Engine.Chunks.Sorting;
 
 /// <summary>
 /// A sort with one thread that is cancelled while a large chunk is parsed, sorted or written must stop within the two
-/// seconds of the requirement "Cancellation" (D19 of the design, "Segments").
+/// seconds of the requirement "Cancellation".
 /// </summary>
 [Collection(nameof(TimedTests))]
 public class CancellationTimingTests

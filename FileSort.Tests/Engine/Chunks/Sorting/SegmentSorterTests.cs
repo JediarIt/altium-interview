@@ -13,7 +13,7 @@ using FileSort.Tests.Generator;
 namespace FileSort.Tests.Engine.Chunks.Sorting;
 
 /// <summary>
-/// The sort of a chunk in segments (D7 of the design): every segment in the order of the naive comparison with the
+/// The sort of a chunk in segments: every segment in the order of the naive comparison with the
 /// tie-break by bytes, every segment starting on a cache line, and a sort with one thread that stops soon after a
 /// cancellation.
 /// </summary>

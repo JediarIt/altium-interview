@@ -2,6 +2,7 @@ using System.Text;
 
 using FileSort.Engine.Lines;
 using FileSort.Engine.Lines.Parsing;
+using FileSort.Engine.Merging;
 
 namespace FileSort.Tests.Engine.Lines;
 
@@ -26,6 +27,15 @@ internal sealed class ParsedLines
     public byte[][] Lines { get; }
 
     public EntryComparer Comparer => new(Buffer);
+
+    /// <summary>The comparison of the heads of a merge over the same lines.</summary>
+    public MergeHeadComparer HeadComparer => new(Buffer);
+
+    /// <summary>The head that a merge makes of the line of an entry.</summary>
+    public MergeHead HeadOf(IndexEntry entry)
+    {
+        return new MergeHead(in entry, Buffer.AsSpan((int)entry.Offset, entry.LineLength));
+    }
 
     public static ParsedLines From(params string[] lines)
     {

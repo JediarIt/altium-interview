@@ -14,7 +14,7 @@ using FileSort.Generator.Content;
 namespace FileSort.Benchmarks.Experiments.Sorter;
 
 /// <summary>
-/// M2 of the design: the write of one sorted chunk by the block merge (D8), in memory, for several sizes of a block and
+/// The write of one sorted chunk by the block merge, in memory, for several sizes of a block and
 /// thread counts. The chunk is default content made by the generator, parsed and sorted once per thread count, then
 /// written again and again to a stream that keeps nothing: what is measured is the merge of the blocks and the copy of
 /// their lines, not a disk.
@@ -35,7 +35,7 @@ internal static class BlockMergeExperiment
 
         Command command = new(
             "block-merge",
-            "M2: the write of one sorted chunk by the block merge, in memory, for several sizes of a block and thread "
+            "The write of one sorted chunk by the block merge, in memory, for several sizes of a block and thread "
             + "counts. It writes nothing to the disk.")
         {
             size, threads, blocks, runs,

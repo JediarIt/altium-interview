@@ -4,7 +4,7 @@ using FileSort.Engine.Lines.Parsing;
 namespace FileSort.Engine.Chunks.Reading;
 
 /// <summary>
-/// Reads the input into the chunk buffer, one chunk after another (D4 of the design): as many bytes as the lines and
+/// Reads the input into the chunk buffer, one chunk after another: as many bytes as the lines and
 /// their index entries can be expected to fill, cut after the last line feed read. The next chunk starts at the file
 /// offset where this one ended, so nothing is copied around; the bytes after the cut are read again.
 /// </summary>

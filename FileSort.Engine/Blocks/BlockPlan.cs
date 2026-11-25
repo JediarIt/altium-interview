@@ -6,7 +6,7 @@ using FileSort.Engine.Lines;
 namespace FileSort.Engine.Blocks;
 
 /// <summary>
-/// The blocks of a chunk (D8 of the design): block b holds, from every sorted segment, the entries from splitter b - 1
+/// The blocks of a chunk: block b holds, from every sorted segment, the entries from splitter b - 1
 /// up to splitter b. Every entry of a block comes after every entry of the blocks before it, so the blocks can be
 /// merged at the same time and written one after another as one sorted run.
 /// </summary>

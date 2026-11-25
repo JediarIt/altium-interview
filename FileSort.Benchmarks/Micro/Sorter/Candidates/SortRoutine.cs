@@ -6,7 +6,7 @@ using FileSort.Engine.Lines;
 namespace FileSort.Benchmarks.Micro.Sorter.Candidates;
 
 /// <summary>
-/// The candidate routines for the sort of a segment of index entries (D7 of the design): the framework's sort with a
+/// The candidate routines for the sort of a segment of index entries: the framework's sort with a
 /// comparison delegate, the framework's sort of elements that compare themselves (the engine's choice), and a
 /// hand-written introsort over a comparer struct.
 /// </summary>

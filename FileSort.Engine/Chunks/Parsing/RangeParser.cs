@@ -22,7 +22,7 @@ internal static class RangeParser
     /// A line is too long when its content, the terminator not counted, passes the limit. In a file read with
     /// <c>\r\n</c>, a line feed without a carriage return before it is not a line end but a byte of the line, which
     /// makes the line invalid; when it lies at or beyond the limit, the line is too long before it, and it is reported
-    /// as such (D12 of the design).
+    /// as such.
     /// </remarks>
     public static RangeResult Parse(
         byte[] bytes, int start, int end, LineEnding lineEnding, int maxLineLength, Span<IndexEntry> slice,

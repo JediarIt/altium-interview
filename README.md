@@ -1,6 +1,6 @@
 # FileSort
 
-External sorting of very large text files (~100 GB and more) in C# / .NET 10, plus a test file generator and an
+External sorting of very large text files (~100 GB) in C# / .NET 10, plus a test file generator and an
 independent checker.
 
 > **Status.** The generator, the checker and the sorter are implemented and measured: the sorter sorts 1 GB in 12 s
@@ -26,19 +26,19 @@ Needs the [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0) or 
 space. In PowerShell, from the root of the repository:
 
 ```powershell
-# 1. Build the generator and the checker as executables in publish/, and the sorter in publish/sorter/
-dotnet publish FileSort.Generator -c Release -r win-x64 -o publish
-dotnet publish FileSort.Checker -c Release -r win-x64 -o publish
+# 1. Build the generator and the checker as executables, and the sorter, each in its folder of publish/
+dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
+dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
 dotnet publish FileSort.Sorter -c Release -o publish/sorter
 
 # 2. Generate a 1 GB test file
-publish/FileSort.Generator.exe --output data/test.txt --size 1GB
+publish/generator/FileSort.Generator.exe --output data/test.txt --size 1GB
 
 # 3. Sort it
 publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.txt
 
 # 4. Check the result: CORRECT and exit code 0 mean that the sorted file is right
-publish/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
+publish/checker/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
 ```
 
 The generator and the checker run without .NET, so they can be copied to another machine. The sorter runs on the
@@ -222,7 +222,9 @@ FileSort.Sorter --input data/test.txt --output data/sorted.txt
   on all threads into an index of 16-byte entries that carry the first 8 bytes of the String, so most comparisons
   never read a line; the index is sorted on all threads, and the sorted parts are merged into one run on all threads
   by ranges of keys. An input that fits in one chunk is written straight to the output.
-- **Merge.** The runs, kept in a temporary folder of the sort's own, are merged into the output with a loser tree.
+- **Merge.** The runs, kept in a temporary folder of the sort's own, are merged into the output with a loser tree;
+  in a merge of 8 runs or more the current line of a run carries 24 bytes of its String and its Number, so most
+  comparisons read no line here either.
   One merge takes about 430 runs at the default memory, about 220 GB of input; more runs are first merged in groups.
 - **Correct by construction and by test.** The output has every line of the input with its bytes, in the order of
   String, then Number of any length, then the bytes of the line, so it does not depend on the threads or the
@@ -267,9 +269,12 @@ The sorter is tested against two oracles that share no code with it: a naive par
 and the checker, run in-process. Generated inputs with every edge case are sorted with 1 to 16 threads and with
 chunk buffers from the smallest, which makes many runs and several merge passes, to one that holds the whole
 input; the output must equal the naive sort byte for byte. The many-run cases keep their runs in memory, so the
-tests write megabytes. Twelve faults put into the engine one at a time, among them a comparison of signed prefixes,
-a block bound off by one and a run's last line dropped, each made tests fail. The tests are described in
-[its README](FileSort.Sorter/README.md#tests); the checker covers the large files.
+tests write megabytes. Seventeen faults put into the engine one at a time, among them a comparison of signed
+prefixes, a block bound off by one and a run's last line dropped, each made tests fail. The tests are described in
+[its README](FileSort.Sorter/README.md#tests); the checker covers the large files. A third oracle comes from
+outside: GNU sort, told where the fields are, writes the same bytes as the sorter for two files of 1 GB and four of
+30 MB, edge cases and both line endings among them (see
+[GNU sort as an oracle from outside](FileSort.Sorter/README.md#gnu-sort-as-an-oracle-from-outside)).
 
 The checker is the tool that verifies the sorter, so it is verified itself, against code that shares nothing with
 it: a naive parser, comparison and sort that live in the test project. Its tests include a catalogue of the ways a
@@ -291,10 +296,10 @@ dotnet test --solution FileSort.slnx -c Release --coverage --coverage-output-for
 | `FileSort.Common` | 100% | 100% |
 | `FileSort.Cli` | 92.3% | 91.7% |
 | `FileSort.Generator` | 98.5% | 93.4% |
-| `FileSort.Checker` | 98.9% | 96.7% |
-| `FileSort.Engine` | 96.9% | 88.7% |
+| `FileSort.Checker` | 98.5% | 96.7% |
+| `FileSort.Engine` | 97.0% | 89.5% |
 | `FileSort.Sorter` | 98.6% | 87.5% |
-| All | 97.7% (3279 of 3355) | 92.0% (1122 of 1219) |
+| All | 97.7% (3323 of 3402) | 92.2% (1152 of 1249) |
 
 The table of a run, and the 80% check, come from `./.github/scripts/coverage-summary.ps1 -Report
 TestResults/coverage.cobertura.xml`. CI applies the check to the assemblies of one program at a time: the
@@ -349,7 +354,7 @@ How the numbers were taken, and how far they can be trusted:
   the timer's error does not matter, and a harness that repeats every case dozens of times would write hundreds of
   gigabytes. What limits them is the number of runs. **A disk figure below comes from one run unless its table
   shows several**, so a difference under about 10% between two rows proves nothing. The experiments now take
-  `--runs` and print the median, the slowest and the fastest run; the tables below were recorded before that and
+  `--runs` and print the median, the slowest and the fastest run; most of the tables were recorded before that and
   were not taken again, to spare the disk.
 
 ### Sorter
@@ -364,9 +369,11 @@ A file of 100 GB, 4.3 billion lines, sorted once with default options, took 35 m
 the 1 GB of `--memory` and half of the 2 GB of the task, but it leaves 5 MiB of the 128 MiB that the sorter keeps
 for the runtime, against about 90 MiB at 1 GB. The cause was found after that run and removed: an array of 400 KB
 allocated for every chunk, which the garbage collector kept until the end of the sort. The 100 GB were not sorted
-again, so the figure is the one from before. A file of 10 GB sorted after the change, in 2 min 42 s with a peak of
-935 MiB, puts the peak of 100 GB near 945 MiB, and its time, extended by the number of runs, predicts the 36
-minutes within 3% (see the [sorter's README](FileSort.Sorter/README.md#end-to-end)).
+again, so the figure is the one from before. A file of 10 GB sorted after the change, with a peak of 935 MiB, puts
+the peak of 100 GB near 945 MiB, and its time, extended by the number of runs, predicts the 36 minutes within 3%.
+After that the merge of 8 runs or more got a wider key for the lines it compares: the file of 10 GB now sorts in
+2 min 24 s where it took 2 min 42 s, which puts 100 GB at about 29 minutes, as an estimate; a sort of 1 GB, two
+runs, is as it was (see the [sorter's README](FileSort.Sorter/README.md#end-to-end)).
 
 The tables, the memory, the edge cases, the cancellation, the cost of the progress bars and the measurements that
 chose the parts of the engine are in the [sorter's README](FileSort.Sorter/README.md#performance).
@@ -510,11 +517,13 @@ build is the one that `dotnet publish` makes anywhere.
 ## Limitations and next steps
 
 - The sorter is correct and within its memory budget, and not tuned beyond the figures of the task: it merges its
-  runs on one thread, which is 70% of the sort of 100 GB, and it reads, sorts and writes in turns. What would make
+  runs on one thread, which was 70% of the sort of 100 GB, and it reads, sorts and writes in turns. What would make
   it faster is known and not done: a parallel final merge by ranges of keys, as in the block merge; reading,
-  sorting and writing at the same time; measured choices of unbuffered I/O, the garbage collector's mode and .NET 11.
-- At 100 GB the peak working set came within 5 MiB of `--memory`. Its cause was removed afterwards and the 100 GB
-  were not sorted again: the peak after the change, about 945 MiB, is an estimate from a sort of 10 GB. Inputs
-  larger than 100 GB were not tried.
+  sorting and writing at the same time; a radix sort of the index of a chunk; measured choices of unbuffered I/O,
+  the garbage collector's mode and .NET 11.
+- It was never run on Linux or macOS: the tests and the measurements are of Windows.
+- The file of 100 GB was sorted once, before two changes: the one that removed what brought its peak working set
+  within 5 MiB of `--memory`, and the wider key in the merge. What the code does now with 100 GB, a peak of about
+  945 MiB and about 29 minutes, is an estimate from sorts of 10 GB. Inputs larger than 100 GB were not tried.
 - The limitations of each program are in its README: [generator](FileSort.Generator/README.md#limitations),
   [checker](FileSort.Checker/README.md#limitations), [sorter](FileSort.Sorter/README.md#limitations).

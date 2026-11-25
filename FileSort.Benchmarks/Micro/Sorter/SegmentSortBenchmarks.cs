@@ -7,7 +7,7 @@ namespace FileSort.Benchmarks.Micro.Sorter;
 
 /// <summary>
 /// The sort of one segment of index entries of default content on one core, by the routine of the engine, for several
-/// sizes of a segment. The segment size is the largest whose sort takes at most half a second (D7 of the design), so
+/// sizes of a segment. The segment size is the largest whose sort takes at most half a second, so
 /// that a sort with one thread checks for Ctrl+C often enough. Every operation sorts a fresh copy of the same
 /// unsorted entries. The routines are compared on a whole chunk, in <see cref="ChunkSortBenchmarks"/>.
 /// </summary>

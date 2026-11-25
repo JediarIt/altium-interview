@@ -12,7 +12,7 @@ using Spectre.Console;
 namespace FileSort.Benchmarks.Experiments.Sorter;
 
 /// <summary>
-/// M8 of the design: what drawing the progress costs while every thread sorts. One sort in memory runs in turns with
+/// What drawing the progress costs while every thread sorts. One sort in memory runs in turns with
 /// the bars of the sorter drawn on the error stream of this console and with nothing drawn, which is what the sorter
 /// does when that stream is redirected; the difference of the medians is the cost. The runs stay in memory and the
 /// output is only counted, so the disk does not take part.
@@ -35,7 +35,7 @@ internal static class ProgressCostExperiment
 
         Command command = new(
             "progress-cost",
-            "M8: the same sort in memory with the progress bars of the sorter drawn on the error stream and without "
+            "The same sort in memory with the progress bars of the sorter drawn on the error stream and without "
             + "them, in turns. Run it in a console. It writes nothing to the disk.")
         {
             size, memory, threads, runs,

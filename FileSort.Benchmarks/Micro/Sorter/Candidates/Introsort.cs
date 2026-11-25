@@ -5,10 +5,10 @@ namespace FileSort.Benchmarks.Micro.Sorter.Candidates;
 
 /// <summary>
 /// An introspective sort, generic over a comparer that is a struct, so that the JIT compiles it once per comparer and
-/// inlines the comparison: the hand-written candidate of D7 of the design for the sort of a segment. The framework's
-/// sort calls a comparison delegate on every comparison, as the comparison of index entries needs the lines. M1
-/// measured this sort slower than the framework's sort of elements that compare themselves, so the engine does not
-/// use it; the benchmarks keep it as the candidate that was measured.
+/// inlines the comparison: the hand-written candidate for the sort of a segment. The framework's sort calls a
+/// comparison delegate on every comparison, as the comparison of index entries needs the lines. A benchmark measured
+/// this sort slower than the framework's sort of elements that compare themselves, so the engine does not use it; the
+/// benchmarks keep it as the candidate that was measured.
 /// </summary>
 /// <remarks>
 /// The algorithm is the textbook one, as the framework uses it too: quicksort with the median of three as the pivot;

@@ -7,7 +7,7 @@ namespace FileSort.Engine.Chunks.Sorting;
 /// segment: that sort calls the comparison directly and inlines it, where a comparison delegate is a call per
 /// comparison. The comparison needs the lines, which an element cannot hold, so they come from a field of the thread
 /// that sorts, read only when the prefixes are equal. The layout is that of <see cref="IndexEntry"/>, so a span of
-/// entries is cast to a span of these. M1 of the design chose it: the sort of a chunk took 10% less time than with a
+/// entries is cast to a span of these. A benchmark chose it: the sort of a chunk took 10% less time than with a
 /// delegate or a hand-written introsort (see the README of the sorter, Performance).
 /// <para>
 /// No code of the solution calls <see cref="CompareTo"/> or the constructor, so an IDE counts no references to them.

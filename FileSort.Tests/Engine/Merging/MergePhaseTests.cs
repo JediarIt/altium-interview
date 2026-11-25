@@ -11,7 +11,7 @@ using FileSort.Tests.Format;
 namespace FileSort.Tests.Engine.Merging;
 
 /// <summary>
-/// The merge of runs (D19 of the design, "Merge"): many runs with tiny buffers, exactly as many runs as one merge
+/// The merge of runs: many runs with tiny buffers, exactly as many runs as one merge
 /// takes and one more, and several passes. After every group only the runs that the plan keeps are left, and the
 /// output is the naive sort of all the lines.
 /// </summary>

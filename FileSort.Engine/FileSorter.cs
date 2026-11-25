@@ -8,7 +8,7 @@ namespace FileSort.Engine;
 
 /// <summary>
 /// Sorts a file into another file, within the memory of its settings, with runs in a temporary folder that it deletes
-/// however the sort ends (D3, D14 and D17 of the design). The output path never holds a partial file: the output is
+/// however the sort ends. The output path never holds a partial file: the output is
 /// written under a temporary name and renamed when it is complete.
 /// </summary>
 public sealed class FileSorter

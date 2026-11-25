@@ -3,14 +3,13 @@ using FileSort.Engine.Runs;
 
 namespace FileSort.Engine;
 
-/// <summary>What a sort works with (D17 of the design). The host checks the values it takes from a user.</summary>
+/// <summary>What a sort works with. The host checks the values it takes from a user.</summary>
 public sealed record SortSettings
 {
-    /// <summary>The longest line that the sorter accepts, its terminator not counted: 1 MiB (D12 of the
-    /// design).</summary>
+    /// <summary>The longest line that the sorter accepts, its terminator not counted: 1 MiB.</summary>
     public const int DefaultMaxLineLength = 1024 * 1024;
 
-    /// <summary>The window of the block buffers in flight, reused as the output buffer of the merge (D13).</summary>
+    /// <summary>The window of the block buffers in flight, reused as the output buffer of the merge.</summary>
     public const int DefaultWindowBytes = 32 * 1024 * 1024;
 
     public required string InputPath { get; init; }
@@ -44,12 +43,18 @@ public sealed record SortSettings
     /// <summary>The free space of the volume of a directory, or null when it cannot be asked.</summary>
     public Func<string, long?> FreeSpace { get; init; } = SpaceCheck.FreeSpaceOf;
 
-    /// <summary>The most entries in a segment that is sorted on its own (D7, chosen by M1).</summary>
+    /// <summary>
+    /// The most entries in a segment that is sorted on its own: the largest whose sort takes at most half a second,
+    /// by the benchmark in the README of the sorter, so that a Ctrl+C never waits longer.
+    /// </summary>
     internal int SegmentEntries { get; init; } = 1 << 20;
 
-    /// <summary>The bytes of lines that a block of the block merge aims at (D8, chosen by M2).</summary>
+    /// <summary>
+    /// The bytes of lines that a block of the block merge aims at: no size from 128 KiB to 4 MiB measured better
+    /// than another, see the README of the sorter.
+    /// </summary>
     internal int BlockBytes { get; init; } = 1024 * 1024;
 
-    /// <summary>The most bytes that one run gets for its buffer in the merge (D10).</summary>
+    /// <summary>The most bytes that one run gets for its buffer in the merge.</summary>
     internal int LargestRunBuffer { get; init; } = 16 * 1024 * 1024;
 }

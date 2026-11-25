@@ -411,7 +411,8 @@ The machine these numbers come from, and how far they can be trusted, are descri
 [root README](../README.md#performance). The first sections measure the published sorter on files, and every output
 was checked by the checker; the sections from [The parts in memory](#the-parts-in-memory) on measure the parts of
 the engine in memory, which chose them. The runs on files wrote about 3 GB in all, the one run of 100 GB about
-300 GB more, the two runs of 10 GB about 50 GB, and the comparison with GNU sort about 8 GB.
+300 GB more, the two runs of 10 GB about 50 GB, the comparison with GNU sort about 8 GB, and the modes of the
+garbage collector about 6 GB.
 
 ### End to end
 
@@ -568,6 +569,60 @@ cmd /c start /wait /affinity FF /belownormal /b "" dotnet FileSort.Benchmarks\bi
 The two series disagree by more than the effect: the machine was faster all round in the first one, and in the
 second the drawn sorts were the faster ones. What the drawing costs is below the noise of the machine, and its
 allocations add about one collection of generation 0 to a sort. The bars stay at ten updates a second.
+
+### The garbage collector
+
+The sorter runs with the runtime's default collector, workstation garbage collection with background collection,
+and its project file says so: four modes were measured, and none was better.
+
+The sorter itself, on the file of 100 MB, with the default `--memory` (one chunk, written straight to the output) and
+with the smallest (two runs and a merge), five runs of each mode in turns, on 8 logical processors at a priority below
+normal; the mode set by the environment variables in the first column:
+
+| Mode | Peak working set, `--memory 1GB` | Peak working set, `--memory 256MB` | Threads at most |
+|---|---|---|---|
+| Workstation, background collection (the default) | 225 to 226 MiB | 160 MiB | 27 to 28 |
+| Workstation, no background collection (`DOTNET_gcConcurrent=0`) | 225 MiB | 160 MiB | 27 |
+| Server, with DATAS (`DOTNET_gcServer=1`) | 226 to 227 MiB | 161 MiB | 35 |
+| Server, without DATAS (also `DOTNET_GCDynamicAdaptationMode=0`) | 226 to 227 MiB | 161 MiB | 35 |
+
+The memory does not depend on the mode: the sorter allocates its two buffers once and almost nothing after them.
+Server collection adds a collector thread for every logical processor, eight here, and nothing else. The times of
+these short sorts, 1.2 to 10.5 s for a sort that takes about a second, followed the load of the machine far more than
+the mode, so they are not shown.
+
+The time, and the work of the collector, come from the whole sort of 1 GB in memory with the buffers of the default
+`--memory` on 8 threads (`sort-phases`, which counts the collections and their pause). The experiment allocates the
+buffers anew for every sort and keeps the runs in memory, so it gives the collector more to do than the sorter, which
+allocates its buffers once and writes its runs to files. Collections and pause are the totals of a row's sorts:
+
+| Mode | Series | Whole sort, median (min to max) | Collections of generation 0 / 1 / 2 | Pause |
+|---|---|---|---|---|
+| Workstation, background collection | first, 2 sorts | 16.56 s (13.39 to 19.74) | 12 / 12 / 2 | 439 ms |
+| Workstation, no background collection | first, 2 sorts | 11.08 s (10.50 to 11.66) | 7 / 7 / 2 | 210 ms |
+| Server, with DATAS | first, 2 sorts | 11.62 s (11.34 to 11.90) | 5 / 5 / 5 | 336 ms |
+| Server, without DATAS | first, 2 sorts | 12.56 s (12.33 to 12.79) | 2 / 2 / 2 | 804 ms |
+| Workstation, no background collection | second, 3 sorts | 13.33 s (10.78 to 14.53) | 14 / 14 / 4 | 619 ms |
+| Workstation, background collection | second, 3 sorts | 10.88 s (10.85 to 12.97) | 3 / 3 / 3 | 222 ms |
+| Workstation, no background collection | second, 3 sorts | 12.49 s (12.40 to 15.22) | 14 / 14 / 4 | 642 ms |
+| Workstation, background collection | second, 3 sorts | 11.36 s (11.22 to 14.12) | 3 / 3 / 3 | 192 ms |
+
+The two series disagree on which workstation mode is faster, by more than the difference between the modes: that is
+the noise of the machine, not the collector. Server collection was no faster in either form. The pause is under
+0.4 s of a sort of 11 to 17 s, in an experiment that gives the collector more to do than the sorter. So the default
+stays, written in `FileSort.Sorter.csproj` as `ServerGarbageCollection` false and `ConcurrentGarbageCollection` true;
+an environment variable still overrides it for a run.
+
+```powershell
+# One run in a mode set by the environment, here server collection
+$env:DOTNET_gcServer = '1'
+publish/sorter/FileSort.Sorter.exe --input data/check-small-100mb.txt --output data/sorted.txt --overwrite --memory 256MB
+Remove-Item Env:DOTNET_gcServer
+
+# The whole sort of 1 GB in memory, with the collections and their pause
+dotnet build FileSort.slnx -c Release
+cmd /c start /wait /affinity FF /belownormal /b "" dotnet FileSort.Benchmarks\bin\Release\net10.0\FileSort.Benchmarks.dll sort-phases --size 1GB --memory 896MB --threads 8 --runs 3
+```
 
 ### The parts in memory
 
@@ -780,9 +835,12 @@ its planning, is kept with the change that added the sorter:
   engine never sees it, and the generator and the checker, which are trimmed into single files, do not get it. When
   the error stream is redirected, Spectre.Console is not used at all.
 - **Reads and writes go through the file cache of the operating system**, and reading, sorting and writing take
-  turns. Overlapping them, unbuffered I/O, a parallel final merge, prefetching and the choice of the garbage
-  collector's mode were left out: the sorter meets the figures of the task without them, and each would need
-  measurements of its own.
+  turns. Overlapping them, unbuffered I/O, a parallel final merge and prefetching were left out: the sorter meets the
+  figures of the task without them, and each would need measurements of its own.
+- **The runtime's default garbage collector, kept by measurement**: workstation collection with background
+  collection, written in the project file. The sorter allocates its buffers once and almost nothing after them, so
+  the mode changed neither its memory, within 2 MiB, nor its time beyond the noise of the machine; server collection
+  only added a collector thread per logical processor (see [The garbage collector](#the-garbage-collector)).
 
 ## Tests
 

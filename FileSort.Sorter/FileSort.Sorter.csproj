@@ -6,6 +6,14 @@
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!--
+      Workstation garbage collection with background collection, the runtime's default, kept by measurement (README,
+      Performance, "The garbage collector"): the sorter allocates its buffers once and almost nothing after them, its
+      peak working set was the same in every mode within 2 MiB, server collection only added a collector thread per
+      logical processor, and background collection on or off made no difference that two series agreed on.
+    -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

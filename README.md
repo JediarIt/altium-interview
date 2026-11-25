@@ -519,8 +519,8 @@ build is the one that `dotnet publish` makes anywhere.
 - The sorter is correct and within its memory budget, and not tuned beyond the figures of the task: it merges its
   runs on one thread, which was 70% of the sort of 100 GB, and it reads, sorts and writes in turns. What would make
   it faster is known and not done: a parallel final merge by ranges of keys, as in the block merge; reading,
-  sorting and writing at the same time; a radix sort of the index of a chunk; measured choices of unbuffered I/O,
-  the garbage collector's mode and .NET 11.
+  sorting and writing at the same time; a radix sort of the index of a chunk; measured choices of unbuffered I/O
+  and .NET 11. The garbage collector's mode was measured: the default stays.
 - It was never run on Linux or macOS: the tests and the measurements are of Windows.
 - The file of 100 GB was sorted once, before two changes: the one that removed what brought its peak working set
   within 5 MiB of `--memory`, and the wider key in the merge. What the code does now with 100 GB, a peak of about

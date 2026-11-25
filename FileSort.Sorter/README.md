@@ -224,9 +224,9 @@ Line ending:      auto
 Overwrite:        no
 ```
 
-While it sorts, it draws two progress bars on the error stream with Spectre.Console: one for the chunks, over the
-bytes of the input read, with the runs written so far; and one for each merge pass, over the bytes it writes, with
-its number when there are several. Each shows its throughput and the time left. When the error stream is
+While it sorts, it draws progress bars on the error stream with Spectre.Console: one for the chunks, over the bytes
+of the input read, with the runs written so far; and one for each merge pass, over the bytes it writes, with its
+number when there are several. Each shows its throughput and the time left. When the error stream is
 redirected, nothing about progress is written, and a log file gets the settings and the messages only.
 
 After a successful sort, standard output gets the summary, as `Name: value` lines that a script can read, and
@@ -314,9 +314,10 @@ slice starts on a cache line of 64 bytes, so that two threads never write to one
 
 A byte order mark at the start of the input is skipped. The line ending is taken from the first line feed after it
 (`\r\n` when a carriage return stands right before it, `\n` otherwise and without any line feed) unless
-`--line-ending` gives it; the line feed is looked for within the first longest line, because a first line without one
-there is too long with either line ending. An input that is not a regular file, a device or a pipe, is refused: the
-sorter needs its length and reads parts of it twice.
+`--line-ending` gives it; the line feed is looked for within the first 1 MiB and 2 bytes of the lines, the longest line
+the sorter accepts with its terminator, because a first line without one there is too long with either line ending.
+An input that is not a regular file, such as a device or a pipe, is refused: the sorter needs its length and reads
+parts of it twice.
 
 ### Parsing, and what is reported
 
@@ -332,9 +333,6 @@ it had none, that is the first problem of the file, whatever `--memory` and `--t
   file read with the wrong line ending can look like one line of a hundred gigabytes. A line that is both too long
   and not valid is reported as too long, unless a line feed without a carriage return in its first 1 MiB makes it not
   valid: the reader finds that line feed while it looks for the end of the line.
-
-All lines are checked while the chunks are made, before anything is written to the output, so an invalid input never
-leaves a partial output, and an output that existed before is untouched.
 
 ### Sorting a chunk
 
@@ -368,8 +366,9 @@ For example, if the splitters are `Apple…` and `Banana…`, one block holds ev
 `Banana…`, taken from every segment, and while one thread merges it, another merges the block from `Banana…`.
 
 A key that a million lines share would put all of them into one block, so splitting uses a strict order: the order
-of lines, then the number of the segment, then the index in the sorted segment. Entries with one key are then split
-between blocks; such lines are identical, so their order changes no byte of the output.
+of lines, then the number of the segment, then the index in the sorted segment. Lines that the order of lines finds
+equal are then split between blocks; such lines are identical byte for byte, so their order changes no byte of the
+output.
 
 The buffers of the blocks in flight are limited in bytes by a window of 32 MiB, not in number. Blocks start strictly
 in order, and a block starts only when its exact size, summed from the lengths in its entries, fits in what the window
@@ -438,7 +437,7 @@ sorted before two changes that came after it, the one described in [Memory](#mem
   the SSD time to empty its fast cache; at this size neither the input nor the runs fit in the file cache of the
   operating system, so they were read from the disk.
 - **The file of 10 GB**, 431 million lines, sorts in 2 min 24 s, with 20 runs and one merge, and the checker found
-  the output correct. It was sorted twice, each time once, after the sort of 100 GB: first to see the memory after
+  the output correct. It was sorted twice after the sort of 100 GB, one run each time: first to see the memory after
   the change described in [Memory](#memory-1) and to put a third point between the other two, in 2 min 42 s (the
   chunks 64.70 s, the merge 97.45 s, a peak of 935 MiB); then with the wider key in the heads of the merge, the row
   of the table. Control sorts of the file of 1 GB by the same builds took 11.19 s and 11.00 s.
@@ -450,8 +449,8 @@ sorted before two changes that came after it, the one described in [Memory](#mem
 - **A sort of 10 GB predicts the sort of 100 GB.** Before the wider key, the merge cost a line 116 ns with 2 runs,
   226 ns with 20 and 347 ns with 195: about 80 ns and about 34 ns more for every level of the loser tree, the
   logarithm to base 2 of the number of runs. The straight line through the sorts of 1 GB and 10 GB gives 335 ns a
-  line with 195 runs, 1444 s for the merge of 100 GB; with the chunks at the rate of the sort of 10 GB, 647 s, that
-  is 34 min 51 s for the whole sort, 3% under the 35 min 49 s measured. With the control sort of 1 GB of the same
+  line with 195 runs, 1444 s for the merge of 100 GB; with the chunks at the rate of the first sort of 10 GB, 647 s,
+  that is 34 min 51 s for the whole sort, 3% under the 35 min 49 s measured. With the control sort of 1 GB of the same
   day in place of the one in the table, the line gives 36 min 16 s, 1% over. So a change to the merge can be
   measured at 10 GB, with 30 GB written, and need not be measured at 100 GB with 300.
 - **What the wider key does to 100 GB is an estimate.** With it the merge of 10 GB costs a line 183 ns, where it
@@ -508,8 +507,9 @@ new array for every chunk: 32 segments by 527 blocks at the default memory, abou
 An array of 85,000 bytes or more lives on the runtime's heap of large objects, which is freed only by a full
 collection, and a sort that allocates almost nothing never causes one. A sort in memory of 198 chunks of that shape,
 a one-off check that is not part of the repository, saw that heap grow by 0.43 MB a chunk, from the 32 MB of the
-window to 117 MB; for the 195 chunks of 100 GB that is 85 MB, and the growth that was measured is 87 MiB. The plan
-now rents its two large arrays, the samples and the bounds of the blocks, from the shared pool of arrays and gives
+window to 117 MB; for the 195 chunks of 100 GB that is 84 MB, or 80 MiB, against the 87 MiB of growth measured in
+that run. The plan now rents its two large arrays, the samples and the bounds of the blocks, from the shared pool of
+arrays and gives
 them back, so the next chunk gets the same ones; the same check then ends with 33 MB on that heap. A test fails if
 a chunk after the first allocates as much as one array of that heap: it allocated 501,528 bytes before the change,
 the samples, the bounds and the small arrays of a plan together. The 100 GB were not sorted again, since that
@@ -608,7 +608,7 @@ allocates its buffers once and writes its runs to files. Collections and pause a
 | Workstation, background collection | second, 3 sorts | 11.36 s (11.22 to 14.12) | 3 / 3 / 3 | 192 ms |
 
 The two series disagree on which workstation mode is faster, by more than the difference between the modes: that is
-the noise of the machine, not the collector. Server collection was no faster in either form. The pause is under
+the noise of the machine, not the collector. Server collection was no faster in either form. The pause is up to
 0.4 s of a sort of 11 to 17 s, in an experiment that gives the collector more to do than the sorter. So the default
 stays, written in `FileSort.Sorter.csproj` as `ServerGarbageCollection` false and `ConcurrentGarbageCollection` true;
 an environment variable still overrides it for a run.
@@ -832,7 +832,7 @@ its planning, is kept with the change that added the sorter:
   poorly. RazorConsole, which the author looked at first, was dropped before any prototype: the sorter takes no input
   from the keyboard while it sorts, so a framework of components on a hosting stack buys nothing over the progress
   display of Spectre.Console. The package, with its one dependency, is referenced by `FileSort.Sorter` alone: the
-  engine never sees it, and the generator and the checker, which are trimmed into single files, do not get it. When
+  engine never sees it, and the generator and the checker, single files checked by the trimmer, do not get it. When
   the error stream is redirected, Spectre.Console is not used at all.
 - **Reads and writes go through the file cache of the operating system**, and reading, sorting and writing take
   turns. Overlapping them, unbuffered I/O, a parallel final merge and prefetching were left out: the sorter meets the
@@ -858,7 +858,7 @@ its planning, is kept with the change that added the sorter:
   limit, and an invalid line whose number and offset must be right across both boundaries. The first problem by
   offset is reported for every buffer size.
 - **Segments and cancellation**: every segment is in the naive order and starts on a cache line; a chunk sorted by one
-  thread stops within the time of "Cancellation".
+  thread stops within the 2 seconds of the requirement "Cancellation".
 - **Blocks**: a line that repeats thousands of times, long lines that sort next to each other, a large block right
   after a window full of small ones, a chunk of one segment. The run must be the naive sort, and the buffers in flight
   must never pass the window. A chunk after the first, of the shape of a chunk at the default memory, must allocate
@@ -904,10 +904,10 @@ outside. The outputs of the sorter and of GNU sort 8.32 were the same, byte for 
 | 30 MB of random Strings of printable ASCII, 1 to 100 bytes | 0.43 million | | |
 
 One run of each; the files of 30 MB were not timed. The GNU sort is the one that comes with Git for Windows, which
-reads and writes files through a layer that imitates POSIX, so the times say more about the agreement than about
-the speed of GNU sort elsewhere. With `\r\n`, GNU sort takes the carriage return for the last byte of the String,
-which gives the sorter's order unless one String is the beginning of another that goes on with a byte below a
-carriage return, a control character; none of these files has such a pair. The comparison is not a test of the
+reads and writes files through a layer that imitates POSIX, so the table shows the agreement, and its times say
+little of the speed of GNU sort elsewhere. With `\r\n`, GNU sort takes the carriage return for the last byte of the
+String, which gives the sorter's order unless one String is the beginning of another that goes on with a byte below
+a carriage return, a control character; none of these files has such a pair. The comparison is not a test of the
 repository: it needs GNU sort, and files of a size that tests do not write.
 
 ### Mutations

@@ -258,8 +258,8 @@ and never with a stack trace.
 
 The machine these numbers come from, and how far they can be trusted, are described in the
 [root README](../README.md#performance): 8 cores with 16 logical processors, limited by power and heat, so the
-same measurement varies by about 10% from run to run. The checker only reads, and every file below was read from
-the file cache of the operating system: these are measurements of the processor cost of a check. The reading
+same measurement varies by about 10% from run to run. The checker only reads, and every file in the tables below was
+read from the file cache of the operating system: these are measurements of the processor cost of a check. The reading
 itself is not the limit in any of them: the same two reading threads feed one checking thread at 353 MiB/s and
 sixteen at 1267 MiB/s (see [Threads](#threads)).
 
@@ -288,7 +288,7 @@ start of the reading to its end, so it leaves out the start of the process and t
 The requirement is a pair of 1 GB in under 3 seconds, the rate at which a pair of 100 GB takes 5 minutes; at the
 measured rate it takes about 3 minutes, if the disk keeps up. Memory must stay under 256 MB and must not follow
 the size of the files: it is under 70 MiB with the default threads, and the same at 100 MB and at 1 GB (see
-[Memory](#memory) for the worst case). The pair of 100 GB itself, the input and the output of the sorter's one run of
+[Memory](#memory) for the worst case). The pair of 100 GB itself, the input and the output of the sorter's one sort of
 that size, was checked once, read from the disk by the regular build started with `dotnet`: 198.46 s (1032 MiB/s),
 a peak working set of 80 MiB, and the result `CORRECT`.
 
@@ -540,10 +540,10 @@ the checker.
   [How it works](#how-it-works)).
 - **Both files are required.** There is no mode that checks only the order or only the validity of one file.
 - **Lines with equal keys are accepted in any order**, although the sorter writes them in the order of their bytes:
-  the checker answers whether a file is sorted, and for the task both orders are; it counts such pairs in the
+  the checker answers whether a file is sorted, and for the task both orders are sorted; it counts such pairs in the
   summary. The sorter's other decisions agree with the checker's: an invalid line stops either program at the first
-  such line, and the sorter writes no byte order mark, on which the result of a check does not depend.
-- **100 GB was checked once**, on the input and the output of the sorter's run of that size; the other figures are
+  such line, and the sorter writes no byte order mark, which the result of a check does not depend on anyway.
+- **100 GB was checked once**, on the input and the output of the sorter's sort of that size; the other figures are
   for files of up to 1 GB read from the file cache.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine.

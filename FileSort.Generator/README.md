@@ -148,7 +148,7 @@ The content versions so far:
 | Version | What changed |
 |---|---|
 | 1 | The first version. |
-| 2 | `big-numbers` also writes 18446744073709551616 and Numbers of 21 to 30 digits, and the category `carriage-return` is new. Files made without `--edge-cases` keep their bytes: the reference file with default options has the same hash in both versions. Files made with edge cases differ. |
+| 2 | `big-numbers` also writes 18446744073709551616 and Numbers of 21 to 30 digits, and the category `carriage-return` is new. Files made without `--edge-cases` keep their bytes: the reference file with default options has the same hash in both versions. Files made with edge cases can differ, as the reference file with `--edge-cases all` does. |
 
 ## Writing the file
 
@@ -374,9 +374,9 @@ BenchmarkDotNet, one core (`micro --filter *`):
 - **Zero bytes are allocated per block** in all three block benchmarks.
 - The row of `--edge-cases all` is of content version 2, measured again on another day with
   `micro --filter *BlockBenchmarks*`: 3.36 and 3.40 ms in two runs, in which the default row gave 2.20 and 2.65 ms.
-  Version 1 measured 2.70 ms, 9% above the default row; version 2 is about a third above it. Version 2 makes one
-  line in 128 a Number of 21 to 30 digits, with 128-bit arithmetic and formatting; that this is the cause is likely
-  and was not measured on its own.
+  Version 1 measured 2.70 ms, 9% above the default row of the table; version 2 is 35% above that row, and 53% and
+  28% above the default row of the same two runs. Version 2 makes one line in 128 a Number of 21 to 30 digits, with
+  128-bit arithmetic and formatting; that this is the cause is likely and was not measured on its own.
 - A new generator per block is why the generator cannot use `System.Random`: each block has its own random stream,
   and creating a seeded `System.Random` costs about 1.9 µs.
 - The Number and the word benchmarks run over a million values, not over a short series repeated in a loop. With a
@@ -385,8 +385,8 @@ BenchmarkDotNet, one core (`micro --filter *`):
   measurement. In the generator no series repeats.
 - The loop-free writer handles the Numbers of plain lines, which fit in 32 bits. The rare Numbers that it cannot
   write (above 32 bits, or with leading zeros) go through the framework's `Utf8Formatter`, and those above 64 bits
-  through the formatting of `UInt128`. A hand-written writer
-  with a digit loop was measured too, at 19.4 ns, slower than the framework's; it was removed.
+  through the formatting of `UInt128`. A hand-written writer with a digit loop was measured too, at 19.4 ns, slower
+  than the framework's; it was removed.
 - The block benchmarks give about 400 MiB/s per core, the pipeline benchmark with one thread 471 MiB/s (the table
   in [Where the limit is](#where-the-limit-is)). The same code runs in both; they were measured in different
   sessions on a machine that slows down as it heats. Compare numbers within one table, not across tables.
@@ -459,9 +459,9 @@ the generator.
   generator), the methods of the hot path have the same size, `WriteLine` 1029 bytes, `Compose` 601, `Apply` 50,
   and the same calls. Two first versions did cost time and were changed back: `Ascii.ToUpperInPlace` for the
   capital letter of every String is not inlined and adds about 3 ns per String (see
-  [The hot path](#the-hot-path)), and a table of the six edge case flags doubled the code of `EdgeRoll.Apply`. A
-  whole word in upper case is rare and does go through the framework. xoshiro256\*\* and SplitMix64 keep the
-  authors' reference code as it is.
+  [The hot path](#the-hot-path)), and a table of the edge case flags, six at the time, doubled the code of
+  `EdgeRoll.Apply`. A whole word in upper case is rare and does go through the framework. xoshiro256\*\* and
+  SplitMix64 keep the authors' reference code as it is.
 - **`System.CommandLine` for the command line.** It is Microsoft's parser, the one behind the `dotnet` CLI: typed
   options, validation, `--help` and `--version`. Without it each of the three programs would carry 100 to 150 lines
   of hand-written parsing and help text. Version 2.0.15 is the latest patch of the line released with .NET 10;

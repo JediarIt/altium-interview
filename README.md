@@ -4,7 +4,8 @@ External sorting of very large text files (~100 GB) in C# / .NET 10, plus a test
 independent checker.
 
 > **Status.** The generator, the checker and the sorter are implemented and measured: the sorter sorts 1 GB in 12 s
-> and 100 GB in 36 minutes, within 1 GB of memory, and the checker finds both outputs correct.
+> within 1 GB of memory and sorted 100 GB in 36 minutes before its last two changes (about 29 minutes is the
+> estimate now); the checker found both outputs correct.
 
 ## Contents
 
@@ -132,8 +133,8 @@ installed (for example a QA machine), as in the [Quick start](#quick-start). For
 is published for the .NET runtime, `dotnet publish FileSort.Sorter -c Release -o publish/sorter`, and runs wherever
 .NET 10 or a newer .NET is installed. The published programs take the same options as `dotnet run`.
 
-Disk space: sorting a file needs roughly 3x its size free (input, temporary runs and output). For the 100 GB
-scenario, plan for about 300 GB.
+Disk space: a sort needs about twice the size of its input free, for the temporary runs and the output; with the
+input, about three times. For the 100 GB scenario, generation included, plan for about 300 GB.
 
 ## Repository layout
 
@@ -171,7 +172,7 @@ and [openspec/specs/sort-order](openspec/specs/sort-order/spec.md); what the sor
 | String comparison | Ordinal, byte by byte over UTF-8, which equals Unicode code point order. Case-sensitive: `Banana` sorts before `apple`. |
 | Number comparison | Numeric, not textual: `2` comes before `10`. A Number is one or more decimal digits; neither the count of digits nor the value is limited, so `18446744073709551616` (one above the 64-bit range) is a valid Number. Leading zeros are valid and do not change the value: `007` is 7. No sign, no spaces. The Number takes part only when the Strings are equal. |
 | Separator | The first `". "` in a line. The String part may itself contain `". "`. |
-| Duplicate lines | Kept: the output has every line of the input, byte for byte, as many times as the input has it. Lines with equal keys are either identical or differ only in the leading zeros of their Numbers: `007. Apple` and `7. Apple`. The sorter writes such lines in the order of their bytes, `0. Apple`, `00. Apple`, `007. Apple`, `07. Apple`, `7. Apple`, so its output depends only on its input; the checker accepts them in any order. |
+| Duplicate lines | Kept: the output has every line of the input, byte for byte, as many times as the input has it. Lines with equal keys are either identical or differ only in the leading zeros of their Numbers: `007. Apple` and `7. Apple`. The sorter writes such lines in the order of their bytes, `0. Apple` before `00. Apple`, and `007. Apple` before `07. Apple` before `7. Apple`, so its output depends only on its input; the checker accepts them in any order. |
 | Line endings | A file has one line ending for all its lines, `\n` or `\r\n`, and the program that reads it works with that one. The last line may lack it. A carriage return that is not part of the line ending is an ordinary byte of the String, also at its end. The sorter's output has the line ending of its input: the checker reads both files with one line ending, taken from the input unless it is given. |
 | Encoding | UTF-8; a String is well-formed UTF-8 without a line feed. A file may start with a byte order mark (BOM), which is not part of the first line. None is written. |
 | Malformed lines | Rejected, never skipped. The sorter stops at the first line that is not valid, in the order of the file, names the line number, its offset and the reason, writes no output and ends with exit code 3. The checker stops the same way at the first such line in either file. |
@@ -223,8 +224,8 @@ FileSort.Sorter --input data/test.txt --output data/sorted.txt
   never read a line; the index is sorted on all threads, and the sorted parts are merged into one run on all threads
   by ranges of keys. An input that fits in one chunk is written straight to the output.
 - **Merge.** The runs, kept in a temporary folder of the sort's own, are merged into the output with a loser tree;
-  in a merge of 8 runs or more the current line of a run carries 24 bytes of its String and its Number, so most
-  comparisons read no line here either.
+  in a merge of 8 runs or more the current line of a run carries the first 24 bytes of its String and the value of
+  its Number, so most comparisons read no line here either.
   One merge takes about 430 runs at the default memory, about 220 GB of input; more runs are first merged in groups.
 - **Correct by construction and by test.** The output has every line of the input with its bytes, in the order of
   String, then Number of any length, then the bytes of the line, so it does not depend on the threads or the
@@ -372,8 +373,8 @@ allocated for every chunk, which the garbage collector kept until the end of the
 again, so the figure is the one from before. A file of 10 GB sorted after the change, with a peak of 935 MiB, puts
 the peak of 100 GB near 945 MiB, and its time, extended by the number of runs, predicts the 36 minutes within 3%.
 After that the merge of 8 runs or more got a wider key for the lines it compares: the file of 10 GB now sorts in
-2 min 24 s where it took 2 min 42 s, which puts 100 GB at about 29 minutes, as an estimate; a sort of 1 GB, two
-runs, is as it was (see the [sorter's README](FileSort.Sorter/README.md#end-to-end)).
+2 min 24 s where it took 2 min 42 s, which puts 100 GB at about 29 minutes, as an estimate; a sort of 1 GB, which
+makes two runs, is as it was (see the [sorter's README](FileSort.Sorter/README.md#end-to-end)).
 
 The tables, the memory, the edge cases, the cancellation, the cost of the progress bars and the measurements that
 chose the parts of the engine are in the [sorter's README](FileSort.Sorter/README.md#performance).
@@ -419,7 +420,8 @@ Notable decisions and their reasons, recorded as they are made.
 - **Progress bars in the sorter only.** A sort of a large file runs for minutes, in phases and merge passes, so the
   sorter draws its progress with Spectre.Console, the author's choice over RazorConsole, which needs a hosting stack
   for nothing the sorter uses. The package is referenced by `FileSort.Sorter` alone: the engine never sees it, and
-  the generator and the checker, trimmed into single files, keep the one progress line of `FileSort.Cli`.
+  the generator and the checker, published as single files and checked by the trimmer, keep the one progress line
+  of `FileSort.Cli`.
 - **The sorting engine is a library without console code**, `FileSort.Engine`, and `FileSort.Sorter` is a thin host
   over it: the algorithm runs in-process in tests and experiments, with its runs in memory when a test wants
   thousands of them. A test fails if the engine's assembly references console code. `--memory` limits the whole
@@ -494,12 +496,14 @@ GitHub Actions workflows live in `.github/workflows/`:
 - **Generator** (`generator.yml`), **Checker** (`checker.yml`) and **Sorter** (`sorter.yml`) each build the
   solution and run the tests of one program with code coverage, on every push to `main` and on every pull request
   that can affect that program. The generator's workflow starts on changes of the generator, of the shared
-  libraries, of the tests and of the build files; the checker's on changes of the checker and on the same shared
-  parts, and also on changes of the generator, because the tests of the checker make their inputs with it; the
-  sorter's on changes of the sorter, of its engine and of the same shared parts, and also of the generator and the
-  checker, because its tests make inputs with the one and check outputs with the other. A commit that touches only
-  the tests of one program starts only that program's workflow, and a commit that touches only documentation or
-  `openspec/` starts nothing.
+  libraries, of the benchmarks, of its own and the shared tests and of the build files; the checker's on changes of
+  the checker and of the same shared parts, and also on changes of the generator, because the tests of the checker
+  make their inputs with it; the sorter's on changes of the sorter, of its engine and of the same shared parts, and
+  also of the generator and the checker, because its tests make inputs with the one and check outputs with the
+  other. A commit that touches only the tests in one program's folder of the tests starts only that program's
+  workflow, unless it changes a test helper that the tests of another program use: such helpers are listed by name
+  in that program's filters. A commit that touches only documentation or `openspec/` starts nothing, except the
+  README of a program, whose table of options its tests read.
 - **Test a program** (`test-program.yml`) holds the steps once; the three workflows call it with the namespaces of
   the tests to run and the assemblies whose coverage counts. It builds the whole solution (warnings are errors in
   every project), runs the tests, and shows the test results and the coverage table on the page of the run; the
@@ -521,7 +525,7 @@ build is the one that `dotnet publish` makes anywhere.
   it faster is known and not done: a parallel final merge by ranges of keys, as in the block merge; reading,
   sorting and writing at the same time; a radix sort of the index of a chunk; measured choices of unbuffered I/O
   and .NET 11. The garbage collector's mode was measured: the default stays.
-- It was never run on Linux or macOS: the tests and the measurements are of Windows.
+- No program was ever run on Linux or macOS: the tests and the measurements are of Windows.
 - The file of 100 GB was sorted once, before two changes: the one that removed what brought its peak working set
   within 5 MiB of `--memory`, and the wider key in the merge. What the code does now with 100 GB, a peak of about
   945 MiB and about 29 minutes, is an estimate from sorts of 10 GB. Inputs larger than 100 GB were not tried.

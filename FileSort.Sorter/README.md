@@ -396,26 +396,38 @@ composes a line.
 The machine these numbers come from, and how far they can be trusted, are described in the
 [root README](../README.md#performance). The first sections measure the published sorter on files, and every output
 was checked by the checker; the sections from [The parts in memory](#the-parts-in-memory) on measure the parts of
-the engine in memory, which chose them. The runs on files wrote about 3 GB in all.
+the engine in memory, which chose them. The runs on files wrote about 3 GB in all, and the one run of 100 GB about
+300 GB more.
 
 ### End to end
 
-The published build, one run of each:
+The published build, one run of each; the file of 100 GB was sorted by the same assembly from the build output,
+started with `dotnet`:
 
 | Input | `--memory` | Threads | Runs | Merge passes | Chunks | Merge | Whole | Peak working set |
 |---|---|---|---|---|---|---|---|---|
 | 100 MB of default content | 1 GB, the default | 8 | 0 | 0 | 0.92 s | 0.00 s | 0.95 s | 226 MiB |
 | 1 GB of default content | 1 GB, the default | 16, the default | 2 | 1 | 6.88 s | 4.99 s | 11.89 s | 932 MiB |
+| 100 GB of default content | 1 GB, the default | 16, the default | 195 | 1 | 653.04 s | 1495.52 s | 2148.58 s | 1019 MiB |
 
 - **The file of 1 GB**, with default options on the whole machine, sorts in 11.9 s, five times under the minute of
   the task, with a peak working set of 932 MiB: under its 1 GB of `--memory`, and under half of the 2 GB of the
   task. One run stands behind the figure: with a margin of five times, the noise of about 10% between runs changes
   nothing, and every run writes 2 GB.
-- **The merge**, on one thread, is 42% of that sort. Making it parallel is the next change's work.
+- **The file of 100 GB**, 4.3 billion lines, sorts in 35 min 49 s, and the checker found the output correct (in
+  3 min 18 s). It ran once: the sort writes about 200 GB. A control sort of the file of 1 GB just before it took
+  12.28 s, so the machine was in its usual state. The input was generated ten minutes before the sort, which left
+  the SSD time to empty its fast cache; at this size neither the input nor the runs fit in the file cache of the
+  operating system, so they were read from the disk.
+- **The merge**, on one thread, is 42% of the sort of 1 GB and 70% of the sort of 100 GB. It grows faster than the
+  input: per GB the chunks took about the same time in both sorts (6.9 and 6.5 s), the merge 5.0 s with 2 runs and
+  15.0 s with 195, where the loser tree makes about eight comparisons a line instead of one. The sort of 1 GB
+  multiplied by 100 would have promised 20 minutes; the sort took 36. A parallel final merge would make it faster;
+  it was not done (see [Limitations](#limitations)).
 - **The file of 100 MB** fits in one chunk at the default memory and is written straight to the output, with no runs
   and no merge. It ran with the process limited to 8 logical processors.
-- Both inputs had been read before, so they may have come from the file cache of the operating system; the runs
-  and the output were written through it.
+- The files of 100 MB and 1 GB had been read before, so they may have come from the file cache of the operating
+  system; the runs and the output were written through it.
 
 ```powershell
 # The inputs, the same as for the measurements of the checker
@@ -426,6 +438,11 @@ dotnet publish FileSort.Sorter -c Release -o publish/sorter
 publish/sorter/FileSort.Sorter.exe --input data/check-default-1gb.txt --output data/sorted.txt
 cmd /c start /wait /affinity FF /b "" publish\sorter\FileSort.Sorter.exe --input data\check-small-100mb.txt --output data\sorted.txt --overwrite
 publish/checker/FileSort.Checker.exe --input data/check-small-100mb.txt --sorted data/sorted.txt
+
+# 100 GB, once: about 300 GB written; ten minutes between the generator and the sort let the SSD's cache empty
+FileSort.Generator --output data/test-100gb.txt --size 100GB --seed 1
+publish/sorter/FileSort.Sorter.exe --input data/test-100gb.txt --output data/sorted-100gb.txt
+publish/checker/FileSort.Checker.exe --input data/test-100gb.txt --sorted data/sorted-100gb.txt
 ```
 
 ### Memory
@@ -433,15 +450,18 @@ publish/checker/FileSort.Checker.exe --input data/check-small-100mb.txt --sorted
 | Input | `--memory` | Threads | Logical processors | Runs | Peak working set |
 |---|---|---|---|---|---|
 | 1 GB of default content | 1 GB, the default | 16 | 16 | 2 | 932 MiB |
+| 100 GB of default content | 1 GB, the default | 16 | 16 | 195 | 1019 MiB |
 | 100 MB of default content | 256 MB, the smallest | 8 | 8 | 2 | 160 MiB |
 | 100 MB of default content | 256 MB | 64, the largest | 2 | 2 | 161 MiB |
 | 100 lines of 1 MB | 256 MB | 8 | 8 | 2 | 120 MiB |
 
 With the smallest `--memory`, the two buffers of the engine are 128 MiB (96 for the chunks and 32 for the window),
 and the peak is 160 MiB: everything else, the runtime and its compiled code, the threads and the console, takes
-about 32 MiB, and 64 threads on two processors add 1 MiB. At the default 1 GB the buffers are 896 MiB and the rest
-36 MiB. The reserve of 128 MiB that the sorter keeps for that rest is about four times what it took, so the rule of
-the design, to grow the reserve if a case needs more, did not apply. With lines of 1 MB the chunk buffer is not
+about 32 MiB, and 64 threads on two processors add 1 MiB. At the default 1 GB the buffers are 896 MiB, and the rest
+was 36 MiB with the file of 1 GB and 123 MiB with the file of 100 GB: it grew with the input, from 2 runs to 195,
+and what grew was not looked for. The reserve of 128 MiB that the sorter keeps for that rest held in every case, by
+5 MiB at 100 GB, so the rule of the design, to grow the reserve if a case needs more, did not apply; inputs larger
+than 100 GB were not tried. With lines of 1 MB the chunk buffer is not
 filled: the first chunk reads as many bytes as lines of 25 bytes would fill, and the second chunk the rest.
 
 ```powershell
@@ -654,7 +674,8 @@ the sorter.
   the error stream is redirected, Spectre.Console is not used at all.
 - **Reads and writes go through the file cache of the operating system**, and reading, sorting and writing take
   turns. Overlapping them, unbuffered I/O, a parallel final merge, prefetching and the choice of the garbage
-  collector's mode belong to the next change, which tunes the sorter on measurements and runs the 100 GB file.
+  collector's mode were left out: the sorter meets the figures of the task without them, and each would need
+  measurements of its own.
 
 ## Tests
 
@@ -712,9 +733,9 @@ and the fault was taken out again. Every fault made tests fail:
 
 ## Limitations
 
-- **The merge runs on one thread.** With eight threads it is already half of a sort in memory (see
-  [The phases](#the-phases)). A parallel final merge, by ranges of keys as in the block merge, is left to the next
-  change.
+- **The merge runs on one thread.** It is 70% of the sort of 100 GB, and with eight threads already half of a sort
+  in memory (see [The phases](#the-phases)). A parallel final merge, by ranges of keys as in the block merge, would
+  make it faster; it was not done.
 - **Reading, sorting and writing take turns**: while a chunk is sorted, the disk waits, and while it is read or
   written, the processor mostly does.
 - **A line is at most 1 MiB**, its terminator not counted.
@@ -726,6 +747,7 @@ and the fault was taken out again. Every fault made tests fail:
   sort replaces the link, and the input keeps its bytes (tried with a hard link on Windows). A path that reaches the
   input's own name in a way the comparison of full paths misses, through a network share for example, makes the
   sort write in place, and a failure or a Ctrl+C during the final merge would then lose the input.
-- **100 GB is not measured yet**; the next change runs it once, and sets a time for it.
+- **100 GB was sorted once, and nothing larger.** Its peak working set came within 5 MiB of `--memory` (see
+  [Memory](#memory-1)); whether a much larger input stays under it was not measured.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine.

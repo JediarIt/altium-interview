@@ -288,8 +288,9 @@ start of the reading to its end, so it leaves out the start of the process and t
 The requirement is a pair of 1 GB in under 3 seconds, the rate at which a pair of 100 GB takes 5 minutes; at the
 measured rate it takes about 3 minutes, if the disk keeps up. Memory must stay under 256 MB and must not follow
 the size of the files: it is under 70 MiB with the default threads, and the same at 100 MB and at 1 GB (see
-[Memory](#memory) for the worst case). The 100 GB check itself is measured once, on the output of the sorter's
-100 GB run in its next change.
+[Memory](#memory) for the worst case). The pair of 100 GB itself, the input and the output of the sorter's one run of
+that size, was checked once, read from the disk by the regular build started with `dotnet`: 198.46 s (1032 MiB/s),
+a peak working set of 80 MiB, and the result `CORRECT`.
 
 ### Threads
 
@@ -542,8 +543,8 @@ the checker.
   the checker answers whether a file is sorted, and for the task both orders are; it counts such pairs in the
   summary. The sorter's other decisions agree with the checker's: an invalid line stops either program at the first
   such line, and the sorter writes no byte order mark, on which the result of a check does not depend.
-- **100 GB is not measured yet.** It is checked once, on the output of the sorter's 100 GB run in its next change;
-  the figures above are for 1 GB read from the file cache.
+- **100 GB was checked once**, on the input and the output of the sorter's run of that size; the other figures are
+  for files of up to 1 GB read from the file cache.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine.
 - **Trim analysis covers trimming only**, as for the generator: a check publish with `PublishTrimmed` reports no

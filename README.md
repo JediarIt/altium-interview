@@ -3,8 +3,8 @@
 External sorting of very large text files (~100 GB and more) in C# / .NET 10, plus a test file generator and an
 independent checker.
 
-> **Status: work in progress.** The generator, the checker and the sorter are implemented and measured: the sorter
-> sorts 1 GB in 12 s within 1 GB of memory. The next change tunes it on measurements and runs the 100 GB file.
+> **Status.** The generator, the checker and the sorter are implemented and measured: the sorter sorts 1 GB in 12 s
+> and 100 GB in 36 minutes, within 1 GB of memory, and the checker finds both outputs correct.
 
 ## Contents
 
@@ -258,8 +258,7 @@ FileSort.Checker --input data/test.txt --sorted data/sorted.txt
   (see [Performance](#performance)).
 
 The options, what exactly is checked, the report, the measurements and the design decisions of the checker are in
-[FileSort.Checker/README.md](FileSort.Checker/README.md). A static HTML report built from the sorter's logs, with
-time per phase, throughput and memory, is a later piece of work.
+[FileSort.Checker/README.md](FileSort.Checker/README.md).
 
 ## Verifying correctness
 
@@ -357,8 +356,12 @@ How the numbers were taken, and how far they can be trusted:
 The published build with default options sorts a 1 GB file in 11.9 s, on all 16 logical processors, with a peak
 working set of 932 MiB (one run: the margin is five times, and a run writes 2 GB). The requirements are under a
 minute and about 2 GB at the same time. With the smallest `--memory`, 256 MB, the peak stays at 160 to 161 MiB, also
-with 64 threads on two processors; the reserve that the sorter keeps for the runtime is about four times what it needs.
-100 GB is measured once, in the next change.
+with 64 threads on two processors.
+
+A file of 100 GB, 4.3 billion lines, sorted once with default options, took 35 min 49 s with a peak working set of
+1019 MiB, and the checker found the output correct. The merge, on one thread, is 70% of that time. The peak is under
+the 1 GB of `--memory` and half of the 2 GB of the task, but it leaves 5 MiB of the 128 MiB that the sorter keeps
+for the runtime, against about 90 MiB at 1 GB.
 
 The tables, the memory, the edge cases, the cancellation, the cost of the progress bars and the measurements that
 chose the parts of the engine are in the [sorter's README](FileSort.Sorter/README.md#performance).
@@ -369,7 +372,8 @@ The published executable with default options checks a pair of 1 GB files, an in
 (the median of five runs) and uses under 70 MiB of memory at 100 MB and at 1 GB alike. The requirements are a pair
 of 1 GB in under 3 seconds, which is the rate of a pair of 100 GB in 5 minutes, and under 256 MB of memory that
 does not grow with the files. The files were read from the file cache of the operating system: the figure is the
-processor cost of a check.
+processor cost of a check. The pair of 100 GB of the sorter's run, read from the disk by the regular build, took
+3 min 18 s with 80 MiB.
 
 The tables, how the check scales with threads, why it is parallel, the cost of the hash and the memory are in the
 [checker's README](FileSort.Checker/README.md#performance).
@@ -397,9 +401,9 @@ Notable decisions and their reasons, recorded as they are made.
   for an output that is not correct. Code 4 is not code 1 because the most useful thing a script can learn from a
   checker is the difference between "checked, and it is wrong" and "could not check". The codes are defined once, in
   `FileSort.Cli`.
-- **Reports instead of a UI.** Visual analysis is planned as a static HTML report built from the Sorter's logs, as
-  a later piece of work. A dedicated UI application would add another technology stack and a lot of code without
-  making the sorter any better.
+- **Summaries instead of a UI.** Every program prints the settings it runs with and a summary at the end; the
+  sorter's has the time of each phase, the throughput and the peak memory. A dedicated UI application, or an HTML
+  report built from logs, would add code and another technology without making the sorting any better.
 - **Progress bars in the sorter only.** A sort of a large file runs for minutes, in phases and merge passes, so the
   sorter draws its progress with Spectre.Console, the author's choice over RazorConsole, which needs a hosting stack
   for nothing the sorter uses. The package is referenced by `FileSort.Sorter` alone: the engine never sees it, and
@@ -494,10 +498,10 @@ build is the one that `dotnet publish` makes anywhere.
 
 ## Limitations and next steps
 
-- The sorter is correct and within its memory budget, and not yet tuned: it merges its runs on one thread, and it
-  reads, sorts and writes in turns. The next change overlaps them, merges in parallel, measures the choices that
-  remain (unbuffered I/O, the garbage collector's mode, .NET 11) and sorts the 100 GB file once.
-- The checker has not checked 100 GB yet; it does so on the sorter's output of the 100 GB run.
-- The HTML report of a sort is a later piece of work.
+- The sorter is correct and within its memory budget, and not tuned beyond the figures of the task: it merges its
+  runs on one thread, which is 70% of the sort of 100 GB, and it reads, sorts and writes in turns. What would make
+  it faster is known and not done: a parallel final merge by ranges of keys, as in the block merge; reading,
+  sorting and writing at the same time; measured choices of unbuffered I/O, the garbage collector's mode and .NET 11.
+- At 100 GB the peak working set came within 5 MiB of `--memory`; inputs larger than 100 GB were not tried.
 - The limitations of each program are in its README: [generator](FileSort.Generator/README.md#limitations),
   [checker](FileSort.Checker/README.md#limitations), [sorter](FileSort.Sorter/README.md#limitations).

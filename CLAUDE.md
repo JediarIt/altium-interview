@@ -156,7 +156,7 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 
 ## Workflow
 
-Each significant piece of work (generator, sorter, checker, report) goes through OpenSpec:
+Each significant piece of work (generator, sorter, checker) goes through OpenSpec:
 
 1. `/openspec-propose` creates `openspec/changes/<name>/` with a proposal, spec deltas, a design and tasks. Planning
    only, no code.

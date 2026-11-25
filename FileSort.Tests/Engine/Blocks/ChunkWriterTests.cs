@@ -93,6 +93,38 @@ public class ChunkWriterTests
     }
 
     [Fact]
+    public void A_chunk_after_the_first_allocates_no_array_for_the_heap_of_large_objects()
+    {
+        // The shape of a chunk at the default memory: 32 segments and about 527 blocks, so about 17,000 samples of 24
+        // bytes, 400 KB. An array of 85,000 bytes or more lives on the heap of large objects, which only a rare full
+        // collection frees: allocated for every chunk, such arrays stayed until the end of a sort of 100 GB.
+        const int LargeObject = 85_000;
+        string[] lines = [.. Enumerable.Range(0, 4096).Select(i => $"{i * 7919 % 4099}. Line {i % 89}")];
+        byte[] input = Encoding.UTF8.GetBytes(string.Concat(lines.Select(line => line + "\n")));
+        ChunkBuffer buffer = new((4 * input.Length) + (1 << 16));
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        ChunkMaker maker = TestChunks.Maker(
+            input,
+            buffer,
+            threads: 1,
+            maxLineLength: MaxLineLength,
+            segmentEntries: 128,
+            cancellationToken: cancellationToken);
+        SortedChunk chunk = maker.Next()!;
+        ChunkWriter writer = new(new BlockWindow(4096, MaxLineLength + 2), input.Length / 527, LineEnding.Lf);
+        ParallelWork work = new(1, cancellationToken);
+        Assert.Equal(32, chunk.Segments.Count);
+
+        // The first write may allocate what the later ones use again.
+        writer.Write(chunk, Stream.Null, work);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        writer.Write(chunk, Stream.Null, work);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.InRange(allocated, 0, LargeObject - 1);
+    }
+
+    [Fact]
     public void Lines_with_equal_keys_are_split_between_blocks_without_changing_a_byte()
     {
         // Every line has the same key; the strict order of the splitters still cuts them into blocks of about equal

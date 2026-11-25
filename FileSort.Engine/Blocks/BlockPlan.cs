@@ -1,3 +1,5 @@
+using System.Buffers;
+
 using FileSort.Engine.Chunks;
 using FileSort.Engine.Lines;
 
@@ -12,11 +14,18 @@ namespace FileSort.Engine.Blocks;
 /// An example: if the splitters are <c>Apple…</c> and <c>Banana…</c>, one block holds every line from <c>Apple…</c> to
 /// just before <c>Banana…</c>, taken from every segment, and while one thread merges it, another merges the block from
 /// <c>Banana…</c>.
+/// <para>
+/// The two large arrays of a plan, the samples and the bounds, are rented from the shared pool of arrays and given
+/// back, the bounds when the plan is disposed. At the default memory a chunk has about 17,000 samples, 400 KB; an
+/// array of 85,000 bytes or more lives on the heap of large objects, which only a rare full collection frees, so
+/// arrays allocated for every chunk stayed in memory until the end of the sort: about 85 MB after the 195 chunks of
+/// a 100 GB input.
+/// </para>
 /// </remarks>
-internal sealed class BlockPlan
+internal sealed class BlockPlan : IDisposable
 {
-    private readonly int[] _bounds;
     private readonly long[] _sizes;
+    private int[] _bounds;
 
     private BlockPlan(int blocks, int segments, int[] bounds, long[] sizes)
     {
@@ -46,8 +55,10 @@ internal sealed class BlockPlan
         Splitter[] splitters = Splitters(chunk, blocks, comparer);
 
         // Bound k of segment s is where block k starts in it: 0 for the first block, the length of the segment after
-        // the last block, and in between the first entry that is not before splitter k.
-        int[] bounds = new int[(blocks + 1) * segments];
+        // the last block, and in between the first entry that is not before splitter k. A rented array holds what its
+        // last user left in it, so the bounds of the first block are cleared; all the others are written below.
+        int[] bounds = ArrayPool<int>.Shared.Rent((blocks + 1) * segments);
+        bounds.AsSpan(0, segments).Clear();
         for (int segment = 0; segment < segments; segment++)
         {
             bounds[(blocks * segments) + segment] = chunk.Segments[segment].Length;
@@ -87,28 +98,53 @@ internal sealed class BlockPlan
         return lines;
     }
 
+    /// <summary>Gives the array of the bounds back to the pool; the plan answers no question after that.</summary>
+    public void Dispose()
+    {
+        if (_bounds.Length > 0)
+        {
+            ArrayPool<int>.Shared.Return(_bounds);
+            _bounds = [];
+        }
+    }
+
     // The samples in the strict order, and every S-th of them as a splitter: blocks - 1 splitters.
     private static Splitter[] Splitters(SortedChunk chunk, int blocks, EntryComparer comparer)
     {
-        List<Splitter> samples = new(chunk.Segments.Count * blocks);
+        int segments = chunk.Segments.Count;
+        Splitter[] rented = ArrayPool<Splitter>.Shared.Rent(segments * blocks);
+        try
+        {
+            Span<Splitter> samples = rented.AsSpan(0, segments * blocks);
+            TakeSamples(chunk, blocks, samples);
+            samples.Sort((x, y) => x.CompareTo(in y, comparer));
+            Splitter[] splitters = new Splitter[blocks - 1];
+            for (int k = 0; k < splitters.Length; k++)
+            {
+                splitters[k] = samples[(k + 1) * segments];
+            }
+
+            return splitters;
+        }
+        finally
+        {
+            ArrayPool<Splitter>.Shared.Return(rented);
+        }
+    }
+
+    // From every segment, as many evenly spaced entries as there are blocks, one segment after another.
+    private static void TakeSamples(SortedChunk chunk, int blocks, Span<Splitter> samples)
+    {
         for (int segment = 0; segment < chunk.Segments.Count; segment++)
         {
             Span<IndexEntry> entries = chunk.Entries(chunk.Segments[segment]);
+            Span<Splitter> ofSegment = samples.Slice(segment * blocks, blocks);
             for (int sample = 0; sample < blocks; sample++)
             {
                 int index = (int)((long)sample * entries.Length / blocks);
-                samples.Add(new Splitter(entries[index], segment, index));
+                ofSegment[sample] = new Splitter(entries[index], segment, index);
             }
         }
-
-        samples.Sort((x, y) => x.CompareTo(in y, comparer));
-        Splitter[] splitters = new Splitter[blocks - 1];
-        for (int k = 0; k < splitters.Length; k++)
-        {
-            splitters[k] = samples[(k + 1) * chunk.Segments.Count];
-        }
-
-        return splitters;
     }
 
     // In every segment, the first entry that is not before the splitter.

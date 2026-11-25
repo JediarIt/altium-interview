@@ -23,7 +23,7 @@ internal sealed class ChunkWriter(BlockWindow window, int blockBytes, LineEnding
     /// bytes.</summary>
     public long Write(SortedChunk chunk, Stream destination, ParallelWork work)
     {
-        BlockPlan plan = BlockPlan.Create(chunk, BlockCount(chunk), _terminator.Length, work);
+        using BlockPlan plan = BlockPlan.Create(chunk, BlockCount(chunk), _terminator.Length, work);
         BlockSchedule schedule = new(plan, _window);
         CancellationToken cancellationToken = work.CancellationToken;
         using CancellationTokenRegistration stopOnCancel = cancellationToken.Register(schedule.Stop);

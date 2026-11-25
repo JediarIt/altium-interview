@@ -8,6 +8,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>14</LangVersion>
     <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <!--
+      A program runs on .NET 10 where it is installed, and on the next major version where it is not: a machine with
+      only the .NET 11 SDK builds this solution, and without this setting it could not run what it built. The
+      standalone executables of the generator and the checker carry their own runtime and ignore it.
+    -->
+    <RollForward>Major</RollForward>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!-- Symbols live inside the assemblies: published apps are a single file, stack traces keep line numbers. -->

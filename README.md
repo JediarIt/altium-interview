@@ -41,9 +41,9 @@ publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.tx
 publish/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
 ```
 
-The generator and the checker run without .NET, so they can be copied to another machine. The sorter needs the
-.NET 10 runtime: it comes with the .NET 10 SDK, and with a newer SDK it is a separate install. Every program lists
-its options with `--help`. Other platforms, tests and running from source:
+The generator and the checker run without .NET, so they can be copied to another machine. The sorter runs on the
+installed .NET: on .NET 10 where there is one, otherwise on the next major version, such as the .NET 11 that comes
+with its SDK. Every program lists its options with `--help`. Other platforms, tests and running from source:
 [Build and run from source](#build-and-run-from-source).
 
 ## The problem
@@ -87,8 +87,9 @@ The solution has three programs:
 ## Build and run from source
 
 Requirements: [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0) or newer (a .NET 11 SDK works too).
-The programs target .NET 10, so running them needs the .NET 10 runtime: it comes with the .NET 10 SDK, and with a
-newer SDK it is a separate install. The code is cross-platform; it is developed and measured on Windows.
+The programs target .NET 10 and run on it where it is installed; on a machine that has only a newer SDK they run on
+that SDK's runtime, the next major version (see [Design decisions](#design-decisions)). The code is cross-platform;
+it is developed and measured on Windows.
 
 Build and run the tests:
 
@@ -129,7 +130,7 @@ The generator and the checker can also be published as single executables that r
 installed (for example a QA machine), as in the [Quick start](#quick-start). For other platforms, use `linux-x64`,
 `osx-arm64` and so on in place of `win-x64`; any machine with the .NET SDK can publish for any of them. The sorter
 is published for the .NET runtime, `dotnet publish FileSort.Sorter -c Release -o publish/sorter`, and runs wherever
-the .NET 10 runtime is installed. The published programs take the same options as `dotnet run`.
+.NET 10 or a newer .NET is installed. The published programs take the same options as `dotnet run`.
 
 Disk space: sorting a file needs roughly 3x its size free (input, temporary runs and output). For the 100 GB
 scenario, plan for about 300 GB.
@@ -291,9 +292,9 @@ dotnet test --solution FileSort.slnx -c Release --coverage --coverage-output-for
 | `FileSort.Cli` | 92.3% | 91.7% |
 | `FileSort.Generator` | 98.5% | 93.4% |
 | `FileSort.Checker` | 98.9% | 96.7% |
-| `FileSort.Engine` | 96.9% | 88.6% |
+| `FileSort.Engine` | 96.9% | 88.7% |
 | `FileSort.Sorter` | 98.6% | 87.5% |
-| All | 97.7% (3266 of 3342) | 92.0% (1120 of 1217) |
+| All | 97.7% (3279 of 3355) | 92.0% (1122 of 1219) |
 
 The table of a run, and the 80% check, come from `./.github/scripts/coverage-summary.ps1 -Report
 TestResults/coverage.cobertura.xml`. CI applies the check to the assemblies of one program at a time: the
@@ -361,7 +362,11 @@ with 64 threads on two processors.
 A file of 100 GB, 4.3 billion lines, sorted once with default options, took 35 min 49 s with a peak working set of
 1019 MiB, and the checker found the output correct. The merge, on one thread, is 70% of that time. The peak is under
 the 1 GB of `--memory` and half of the 2 GB of the task, but it leaves 5 MiB of the 128 MiB that the sorter keeps
-for the runtime, against about 90 MiB at 1 GB.
+for the runtime, against about 90 MiB at 1 GB. The cause was found after that run and removed: an array of 400 KB
+allocated for every chunk, which the garbage collector kept until the end of the sort. The 100 GB were not sorted
+again, so the figure is the one from before. A file of 10 GB sorted after the change, in 2 min 42 s with a peak of
+935 MiB, puts the peak of 100 GB near 945 MiB, and its time, extended by the number of runs, predicts the 36
+minutes within 3% (see the [sorter's README](FileSort.Sorter/README.md#end-to-end)).
 
 The tables, the memory, the edge cases, the cancellation, the cost of the progress bars and the measurements that
 chose the parts of the engine are in the [sorter's README](FileSort.Sorter/README.md#performance).
@@ -457,6 +462,12 @@ Notable decisions and their reasons, recorded as they are made.
 - **Any recent SDK builds it.** The programs target .NET 10 (LTS), but any SDK from 10.0 up can build them. The C#
   version and the analyzer rule set are pinned to .NET 10, so a newer SDK produces the same warnings and cannot
   break the strict build.
+- **What it builds, it can run.** By default a .NET program refuses to start on a newer major version of the runtime
+  than the one it targets, so a machine with only the .NET 11 SDK would build the sorter and then fail to run it,
+  and the tests with it. The projects therefore set `RollForward` to `Major`: .NET 10 is used where it is installed,
+  the next major version where it is not. A test reads the setting from the built sorter. The price is that on such
+  a machine the programs run on a runtime they were not measured on: every figure here is of .NET 10, and on .NET 11
+  the sorter was tried once, on a small file, with the same output byte for byte.
 - **Invariant globalization.** Comparison is ordinal, so the programs need no culture data.
 - **Reproducible restore.** A local `nuget.config` and central package versions keep the build independent of the
   machine it runs on.
@@ -502,6 +513,8 @@ build is the one that `dotnet publish` makes anywhere.
   runs on one thread, which is 70% of the sort of 100 GB, and it reads, sorts and writes in turns. What would make
   it faster is known and not done: a parallel final merge by ranges of keys, as in the block merge; reading,
   sorting and writing at the same time; measured choices of unbuffered I/O, the garbage collector's mode and .NET 11.
-- At 100 GB the peak working set came within 5 MiB of `--memory`; inputs larger than 100 GB were not tried.
+- At 100 GB the peak working set came within 5 MiB of `--memory`. Its cause was removed afterwards and the 100 GB
+  were not sorted again: the peak after the change, about 945 MiB, is an estimate from a sort of 10 GB. Inputs
+  larger than 100 GB were not tried.
 - The limitations of each program are in its README: [generator](FileSort.Generator/README.md#limitations),
   [checker](FileSort.Checker/README.md#limitations), [sorter](FileSort.Sorter/README.md#limitations).

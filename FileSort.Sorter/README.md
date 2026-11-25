@@ -43,8 +43,9 @@ FileSort.Checker -i data/test.txt -s data/sorted.txt
 
 `FileSort.Sorter` stands for either way of starting it: `dotnet run -c Release --project FileSort.Sorter --` or the
 published build (see [Quick start](../README.md#quick-start)). Unlike the generator and the checker, the sorter is
-published for the .NET 10 runtime, not as a self-contained executable: QA engineers make test files and check
-results, and the sorter is what they test. The directory of `--temp` must exist.
+published for the installed .NET runtime, not as a self-contained executable: QA engineers make test files and check
+results, and the sorter is what they test. It runs on .NET 10, or on the next major version where .NET 10 is not
+installed. The directory of `--temp` must exist.
 
 ## Options
 
@@ -396,18 +397,19 @@ composes a line.
 The machine these numbers come from, and how far they can be trusted, are described in the
 [root README](../README.md#performance). The first sections measure the published sorter on files, and every output
 was checked by the checker; the sections from [The parts in memory](#the-parts-in-memory) on measure the parts of
-the engine in memory, which chose them. The runs on files wrote about 3 GB in all, and the one run of 100 GB about
-300 GB more.
+the engine in memory, which chose them. The runs on files wrote about 3 GB in all, the one run of 100 GB about
+300 GB more, and the one run of 10 GB about 30 GB.
 
 ### End to end
 
 The published build, one run of each; the file of 100 GB was sorted by the same assembly from the build output,
-started with `dotnet`:
+started with `dotnet`, and the file of 10 GB by the build output after the change described in [Memory](#memory-1):
 
 | Input | `--memory` | Threads | Runs | Merge passes | Chunks | Merge | Whole | Peak working set |
 |---|---|---|---|---|---|---|---|---|
 | 100 MB of default content | 1 GB, the default | 8 | 0 | 0 | 0.92 s | 0.00 s | 0.95 s | 226 MiB |
 | 1 GB of default content | 1 GB, the default | 16, the default | 2 | 1 | 6.88 s | 4.99 s | 11.89 s | 932 MiB |
+| 10 GB of default content | 1 GB, the default | 16, the default | 20 | 1 | 64.70 s | 97.45 s | 162.18 s | 935 MiB |
 | 100 GB of default content | 1 GB, the default | 16, the default | 195 | 1 | 653.04 s | 1495.52 s | 2148.58 s | 1019 MiB |
 
 - **The file of 1 GB**, with default options on the whole machine, sorts in 11.9 s, five times under the minute of
@@ -419,11 +421,22 @@ started with `dotnet`:
   12.28 s, so the machine was in its usual state. The input was generated ten minutes before the sort, which left
   the SSD time to empty its fast cache; at this size neither the input nor the runs fit in the file cache of the
   operating system, so they were read from the disk.
-- **The merge**, on one thread, is 42% of the sort of 1 GB and 70% of the sort of 100 GB. It grows faster than the
-  input: per GB the chunks took about the same time in both sorts (6.9 and 6.5 s), the merge 5.0 s with 2 runs and
-  15.0 s with 195, where the loser tree makes about eight comparisons a line instead of one. The sort of 1 GB
-  multiplied by 100 would have promised 20 minutes; the sort took 36. A parallel final merge would make it faster;
-  it was not done (see [Limitations](#limitations)).
+- **The file of 10 GB**, 431 million lines, sorts in 2 min 42 s, with 20 runs and one merge, and the checker found
+  the output correct. It ran once, after the sort of 100 GB, to see the memory after the change described in
+  [Memory](#memory-1) and to put a third point between the other two; a control sort of the file of 1 GB just before
+  it took 11.19 s.
+- **The merge**, on one thread, is 42% of the sort of 1 GB, 60% of the sort of 10 GB and 70% of the sort of 100 GB.
+  It grows faster than the input: per GB the chunks took about the same time in the three sorts (6.9, 6.5 and
+  6.5 s), the merge 5.0 s with 2 runs, 9.7 s with 20 and 15.0 s with 195, where the loser tree makes about eight
+  comparisons a line instead of one. The sort of 1 GB multiplied by 100 would have promised 20 minutes; the sort
+  took 36. A parallel final merge would make it faster; it was not done (see [Limitations](#limitations)).
+- **A sort of 10 GB predicts the sort of 100 GB.** The merge costs a line 116 ns with 2 runs, 226 ns with 20 and
+  347 ns with 195: about 80 ns and about 34 ns more for every level of the loser tree, the logarithm to base 2 of
+  the number of runs. The straight line through the sorts of 1 GB and 10 GB gives 335 ns a line with 195 runs,
+  1444 s for the merge of 100 GB; with the chunks at the rate of the sort of 10 GB, 647 s, that is 34 min 51 s for
+  the whole sort, 3% under the 35 min 49 s measured. With the control sort of 1 GB of the same day in place of the
+  one in the table, the line gives 36 min 16 s, 1% over. So a change to the merge can be measured at 10 GB, with
+  30 GB written, and need not be measured at 100 GB with 300.
 - **The file of 100 MB** fits in one chunk at the default memory and is written straight to the output, with no runs
   and no merge. It ran with the process limited to 8 logical processors.
 - The files of 100 MB and 1 GB had been read before, so they may have come from the file cache of the operating
@@ -439,6 +452,11 @@ publish/sorter/FileSort.Sorter.exe --input data/check-default-1gb.txt --output d
 cmd /c start /wait /affinity FF /b "" publish\sorter\FileSort.Sorter.exe --input data\check-small-100mb.txt --output data\sorted.txt --overwrite
 publish/checker/FileSort.Checker.exe --input data/check-small-100mb.txt --sorted data/sorted.txt
 
+# 10 GB, once: about 30 GB written
+FileSort.Generator --output data/test-10gb.txt --size 10GB --seed 1
+FileSort.Sorter/bin/Release/net10.0/FileSort.Sorter.exe --input data/test-10gb.txt --output data/sorted-10gb.txt
+publish/checker/FileSort.Checker.exe --input data/test-10gb.txt --sorted data/sorted-10gb.txt
+
 # 100 GB, once: about 300 GB written; ten minutes between the generator and the sort let the SSD's cache empty
 FileSort.Generator --output data/test-100gb.txt --size 100GB --seed 1
 publish/sorter/FileSort.Sorter.exe --input data/test-100gb.txt --output data/sorted-100gb.txt
@@ -450,7 +468,8 @@ publish/checker/FileSort.Checker.exe --input data/test-100gb.txt --sorted data/s
 | Input | `--memory` | Threads | Logical processors | Runs | Peak working set |
 |---|---|---|---|---|---|
 | 1 GB of default content | 1 GB, the default | 16 | 16 | 2 | 932 MiB |
-| 100 GB of default content | 1 GB, the default | 16 | 16 | 195 | 1019 MiB |
+| 10 GB of default content, after the change below | 1 GB, the default | 16 | 16 | 20 | 935 MiB |
+| 100 GB of default content, before the change below | 1 GB, the default | 16 | 16 | 195 | 1019 MiB |
 | 100 MB of default content | 256 MB, the smallest | 8 | 8 | 2 | 160 MiB |
 | 100 MB of default content | 256 MB | 64, the largest | 2 | 2 | 161 MiB |
 | 100 lines of 1 MB | 256 MB | 8 | 8 | 2 | 120 MiB |
@@ -458,11 +477,29 @@ publish/checker/FileSort.Checker.exe --input data/test-100gb.txt --sorted data/s
 With the smallest `--memory`, the two buffers of the engine are 128 MiB (96 for the chunks and 32 for the window),
 and the peak is 160 MiB: everything else, the runtime and its compiled code, the threads and the console, takes
 about 32 MiB, and 64 threads on two processors add 1 MiB. At the default 1 GB the buffers are 896 MiB, and the rest
-was 36 MiB with the file of 1 GB and 123 MiB with the file of 100 GB: it grew with the input, from 2 runs to 195,
-and what grew was not looked for. The reserve of 128 MiB that the sorter keeps for that rest held in every case, by
-5 MiB at 100 GB, so the rule of the design, to grow the reserve if a case needs more, did not apply; inputs larger
+was 36 MiB with the file of 1 GB and 123 MiB with the file of 100 GB: it grew with the input, from 2 runs to 195.
+The reserve of 128 MiB that the sorter keeps for that rest held in every case, by 5 MiB at 100 GB; inputs larger
 than 100 GB were not tried. With lines of 1 MB the chunk buffer is not
 filled: the first chunk reads as many bytes as lines of 25 bytes would fill, and the second chunk the rest.
+
+What grew was found after the run of 100 GB, and removed. The plan of the blocks of a chunk took its samples into a
+new array for every chunk: 32 segments by 527 blocks at the default memory, about 17,000 samples of 24 bytes, 400 KB.
+An array of 85,000 bytes or more lives on the runtime's heap of large objects, which is freed only by a full
+collection, and a sort that allocates almost nothing never causes one: 195 chunks left about 85 MB of such arrays,
+which is the growth that was measured, 87 MiB. The plan now rents its two large arrays from the shared pool of
+arrays and gives them back, so the next chunk gets the same ones, and a test fails if a chunk after the first
+allocates enough for one array of that heap (501,528 bytes before the change). A sort in memory of 198 chunks of that
+shape, a one-off check that is not part of the repository, left 117 MB on the heap of large objects before the
+change and 33 MB after it, of which 32 are the window. The 100 GB were not sorted again, since that writes 300 GB:
+the peak of 1019 MiB in the tables is the one measured before the change.
+
+A sort of 10 GB after the change, 20 chunks, shows what to expect of 100 GB. Its peak is 935 MiB, so the rest is
+39 MiB. Its working set, read four times a second by a small program that is not part of the repository, grew from
+the second chunk to the last by 0.06 MiB a chunk, with a standard error of 0.03, and its private bytes by 0.02,
+which is no growth; before the change the sorts of 1 GB and 100 GB give 0.45 MiB a chunk. At 0.06 MiB a chunk the
+195 chunks of 100 GB end near 940 MiB, and the merge, whose peak was 5 MiB above the chunks, near 945 MiB, which
+leaves about 80 MiB of the reserve where 5 were left. That is an estimate from 18 points, not a measurement: with
+the slope two standard errors higher it is 958 MiB.
 
 ```powershell
 cmd /c start /wait /affinity FF /b "" publish\sorter\FileSort.Sorter.exe --input data\check-small-100mb.txt --output data\sorted.txt --overwrite --memory 256MB
@@ -696,7 +733,8 @@ the sorter.
   thread stops within the time of "Cancellation".
 - **Blocks**: a line that repeats thousands of times, long lines that sort next to each other, a large block right
   after a window full of small ones, a chunk of one segment. The run must be the naive sort, and the buffers in flight
-  must never pass the window.
+  must never pass the window. A chunk after the first, of the shape of a chunk at the default memory, must allocate
+  less than one array of the heap of large objects (see [Memory](#memory-1)).
 - **Merge**: many runs with tiny buffers; exactly as many runs as one merge takes, and one more; several passes; after
   every group only the runs that the plan keeps are left.
 - **The whole sort in memory**: generated input with every edge case, 1, 2, 7 and 16 threads, chunk buffers from the
@@ -747,7 +785,8 @@ and the fault was taken out again. Every fault made tests fail:
   sort replaces the link, and the input keeps its bytes (tried with a hard link on Windows). A path that reaches the
   input's own name in a way the comparison of full paths misses, through a network share for example, makes the
   sort write in place, and a failure or a Ctrl+C during the final merge would then lose the input.
-- **100 GB was sorted once, and nothing larger.** Its peak working set came within 5 MiB of `--memory` (see
-  [Memory](#memory-1)); whether a much larger input stays under it was not measured.
+- **100 GB was sorted once, and nothing larger.** Its peak working set came within 5 MiB of `--memory`; the cause
+  was removed afterwards (see [Memory](#memory-1)), and the 100 GB were not sorted again: a sort of 10 GB puts
+  their peak near 945 MiB, as an estimate. Whether a much larger input stays under `--memory` was not measured.
 - **Windows-only measurements.** The code is cross-platform, but it was developed and measured on one Windows
   machine.

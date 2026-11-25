@@ -95,7 +95,9 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 ## Performance
 
 - Work on raw UTF-8 bytes (`Span<byte>` / `Memory<byte>`); no `string` per line on hot paths.
-- No per-line heap allocations: large pooled buffers, struct-based line entries.
+- No per-line heap allocations: large pooled buffers, struct-based line entries. No array of 85,000 bytes or more
+  allocated per chunk or per run either: it lives on the heap of large objects, which only a full collection frees,
+  and a sort that allocates almost nothing never causes one. Rent such arrays or keep them.
 - Account for the memory budget explicitly (data buffers, line index, I/O buffers) and verify it via peak working
   set. Choose the GC mode deliberately and measure it.
 - Overlap I/O with CPU work and use all cores for parsing and sorting.
@@ -110,6 +112,7 @@ new reference hashes in `ReferenceFileTests`; a hash recorded for an existing ve
 
 - Target `net10.0` with C# 14. The language version and the analyzer rules are pinned to .NET 10 in
   `Directory.Build.props`, so any SDK from 10.0 up produces the same warnings; don't raise them without a reason.
+  `RollForward` is `Major` there, so a machine that has only a newer runtime still runs what it builds.
 - Warnings are errors and nullable reference types are on. NuGet audit warnings (NU1901-NU1904) are the only
   exception: new advisories appear over time and must not break a clean checkout later.
 - Package versions live in `Directory.Packages.props`; `PackageReference` items carry no `Version`.

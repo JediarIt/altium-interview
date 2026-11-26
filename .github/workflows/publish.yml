@@ -1,43 +1,32 @@
-name: Publish a program
+name: Publish a release
 
-# Builds the generator or the checker as one self-contained executable that runs without .NET installed. Started by
-# hand: the "Run workflow" button on the Actions page, with the program and the target platform as its inputs. The
-# executable is attached to the run as an artifact.
+# Builds the three programs for Windows x64, checks them, and publishes them as a GitHub release: one archive,
+# FileSort-win-x64.zip under the same name in every release, that unpacks into publish/generator, publish/checker and
+# publish/sorter, the folders that the Quick start of the README uses. Started by hand: the "Run workflow" button on
+# the Actions page, with the version as its input. The release and its tag are v<version>, on the commit that the
+# workflow runs on; a version that is already released fails.
 on:
   workflow_dispatch:
     inputs:
-      program:
-        description: Program
-        type: choice
-        default: generator
-        options:
-          - generator
-          - checker
-      runtime:
-        description: Target platform
-        type: choice
-        default: win-x64
-        options:
-          - win-x64
-          - win-arm64
-          - linux-x64
-          - linux-arm64
-          - osx-x64
-          - osx-arm64
+      version:
+        description: Version, such as 1.0.0 (the release and its tag are v<version>)
+        type: string
+        required: true
 
+# Creating a release and its tag needs write access to the contents of the repository.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  publish:
-    name: FileSort ${{ inputs.program }} for ${{ inputs.runtime }}
+  release:
+    name: FileSort ${{ inputs.version }} for Windows x64
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
-      # The project of the program and the name of its executable.
-      PROJECT: ${{ inputs.program == 'checker' && 'FileSort.Checker' || 'FileSort.Generator' }}
+      # The input reaches the scripts through the environment and is never pasted into their text.
+      VERSION: ${{ inputs.version }}
 
     steps:
       - uses: actions/checkout@v7
@@ -47,17 +36,29 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      # A self-contained single file is not NativeAOT, so any machine publishes for any platform.
-      - name: Publish
-        shell: pwsh
-        run: dotnet publish $env:PROJECT -c Release -r ${{ inputs.runtime }} -o publish/${{ inputs.program }}
-
-      # The published generator must write the same bytes as the regular build. It can be run only when the target
-      # platform is the platform of this runner.
-      - name: Compare the generator with the regular build
-        if: ${{ inputs.program == 'generator' && inputs.runtime == 'win-x64' }}
+      - name: Check the version
         shell: pwsh
         run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            "::error title=Release::The version must look like 1.0.0, and '$env:VERSION' does not."
+            exit 1
+          }
+
+      # Every program carries its runtime, so the archive runs on a Windows machine without .NET. The generator and
+      # the checker are single files, as the Quick start builds them; the sorter is a folder with its runtime.
+      - name: Publish the three programs
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
+          dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
+          dotnet publish FileSort.Sorter -c Release -r win-x64 --self-contained -o publish/sorter
+
+      # The published generator must write the bytes of the regular build.
+      - name: Compare the generator with the regular build
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           dotnet run -c Release --project FileSort.Generator -- --output data/regular.txt --size 1MB --seed 1
           ./publish/generator/FileSort.Generator.exe --output data/published.txt --size 1MB --seed 1
           $regular = (Get-FileHash data/regular.txt -Algorithm SHA256).Hash
@@ -65,40 +66,77 @@ jobs:
           "Regular build:        $regular"
           "Published executable: $published"
           if ($regular -ne $published) {
-            '::error title=Publish::The published executable and the regular build wrote different bytes.'
+            '::error title=Release::The published generator and the regular build wrote different bytes.'
             exit 1
           }
-          "### FileSort.Generator for ${{ inputs.runtime }}", '', "SHA-256 of the 1 MB reference file: ``$published``" |
-            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
 
-      # The published checker must give the results of the regular build: exit code 0 for a correct pair and 4 for a
-      # pair whose output has an order violation. The two pairs are written here, a few lines each.
-      - name: Check a correct pair and a broken pair with the checker
-        if: ${{ inputs.program == 'checker' && inputs.runtime == 'win-x64' }}
+      # The steps of the Quick start with the published programs, on 1 MB: the checker must find the output correct.
+      - name: Generate, sort and check a file with the published programs
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          ./publish/generator/FileSort.Generator.exe --output data/test.txt --size 1MB --seed 1
+          ./publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.txt
+          ./publish/checker/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
+
+      # A pair whose output has an order violation must give the checker's exit code 4.
+      - name: Check a broken pair with the published checker
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force data | Out-Null
-          [IO.File]::WriteAllText("$PWD/data/input.txt", "415. Apple`n30432. Something something something`n1. Apple`n32. Cherry is the best`n2. Banana is yellow`n")
-          [IO.File]::WriteAllText("$PWD/data/correct.txt", "1. Apple`n415. Apple`n2. Banana is yellow`n32. Cherry is the best`n30432. Something something something`n")
-          [IO.File]::WriteAllText("$PWD/data/broken.txt", "415. Apple`n1. Apple`n2. Banana is yellow`n32. Cherry is the best`n30432. Something something something`n")
-
-          ./publish/checker/FileSort.Checker.exe --input data/input.txt --sorted data/correct.txt
-          $correct = $LASTEXITCODE
+          # The same four lines, and in the broken file 415 comes before 1 in front of the equal String Apple.
+          $inputLines = "415. Apple`n30432. Something something something`n1. Apple`n32. Cherry is the best`n"
+          $brokenLines = "415. Apple`n1. Apple`n32. Cherry is the best`n30432. Something something something`n"
+          [IO.File]::WriteAllText("$PWD/data/input.txt", $inputLines)
+          [IO.File]::WriteAllText("$PWD/data/broken.txt", $brokenLines)
           ./publish/checker/FileSort.Checker.exe --input data/input.txt --sorted data/broken.txt
-          $broken = $LASTEXITCODE
-          "Exit code for the correct pair: $correct (expected 0)"
-          "Exit code for the broken pair:  $broken (expected 4)"
-          if ($correct -ne 0 -or $broken -ne 4) {
-            '::error title=Publish::The published checker did not give the exit codes 0 and 4.'
+          $code = $LASTEXITCODE
+          "Exit code for the broken pair: $code (expected 4)"
+          if ($code -ne 4) {
+            '::error title=Release::The published checker did not give exit code 4 for a broken pair.'
             exit 1
           }
-          "### FileSort.Checker for ${{ inputs.runtime }}", '', 'A correct pair gave exit code 0, a pair with an order violation exit code 4.' |
-            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           exit 0
 
-      - name: Upload the executable
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ env.PROJECT }}-${{ inputs.runtime }}
-          path: publish/${{ inputs.program }}/
-          if-no-files-found: error
+      - name: Pack the programs
+        shell: pwsh
+        run: Compress-Archive -Path publish -DestinationPath FileSort-win-x64.zip
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $archive = 'FileSort-win-x64.zip'
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $notes = @'
+          The three programs of FileSort for Windows x64, built from this commit. Each carries its .NET runtime, so
+          nothing needs to be installed.
+
+          Download `__ARCHIVE__`, then run in PowerShell, in the folder of the archive:
+
+          ```powershell
+          Expand-Archive __ARCHIVE__ -DestinationPath .
+          publish/generator/FileSort.Generator.exe --output data/test.txt --size 1GB
+          publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.txt
+          publish/checker/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
+          ```
+
+          `CORRECT` and exit code 0 from the checker mean that the sorted file is right. Every program lists its
+          options with `--help`. Before this release was published, these very programs generated, sorted and checked
+          a file of 1 MB.
+
+          SHA-256 of the archive: `__SHA256__`
+          '@
+          $notes = $notes.Replace('__ARCHIVE__', $archive).Replace('__SHA256__', $hash)
+          Set-Content -Path notes.md -Value $notes -Encoding utf8
+          $release = @(
+            'release', 'create', "v$env:VERSION", $archive,
+            '--target', $env:GITHUB_SHA,
+            '--title', "FileSort $env:VERSION",
+            '--notes-file', 'notes.md'
+          )
+          gh @release
+          "### FileSort $env:VERSION", '', "Published ``$archive``, SHA-256 ``$hash``." |
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8

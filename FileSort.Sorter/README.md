@@ -42,10 +42,11 @@ FileSort.Checker -i data/test.txt -s data/sorted.txt
 ```
 
 `FileSort.Sorter` stands for either way of starting it: `dotnet run -c Release --project FileSort.Sorter --` or the
-published build (see [Quick start](../README.md#quick-start)). Unlike the generator and the checker, the sorter is
-published for the installed .NET runtime, not as a self-contained executable: QA engineers make test files and check
-results, and the sorter is what they test. It runs on .NET 10, or on the next major version where .NET 10 is not
-installed. The directory of `--temp` must exist.
+published build. The release of the [Quick start](../README.md#quick-start) carries a .NET runtime for it, as for the
+generator and the checker. Built from source, unlike them, it is published for the installed .NET runtime, not as a
+self-contained executable, because QA engineers make test files and check results, and the sorter is what they test;
+it then runs on .NET 10, or on the next major version where .NET 10 is not installed. The directory of `--temp` must
+exist.
 
 ## Options
 

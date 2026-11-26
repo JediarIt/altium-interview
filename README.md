@@ -23,29 +23,25 @@ independent checker.
 
 ## Quick start
 
-Needs the [.NET SDK 10.0](https://dotnet.microsoft.com/download/dotnet/10.0) or newer and about 3 GB of free disk
-space. In PowerShell, from the root of the repository:
+On Windows x64, with nothing to install and about 3 GB of free disk space. Download `FileSort-win-x64.zip` from the
+[latest release](../../releases/latest), then run in PowerShell, in the folder of the archive:
 
 ```powershell
-# 1. Build the generator and the checker as executables, and the sorter, each in its folder of publish/
-dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
-dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
-dotnet publish FileSort.Sorter -c Release -o publish/sorter
+# Unpack the three programs into publish/generator, publish/checker and publish/sorter
+Expand-Archive FileSort-win-x64.zip -DestinationPath .
 
-# 2. Generate a 1 GB test file
+# Generate a 1 GB test file
 publish/generator/FileSort.Generator.exe --output data/test.txt --size 1GB
 
-# 3. Sort it
+# Sort it
 publish/sorter/FileSort.Sorter.exe --input data/test.txt --output data/sorted.txt
 
-# 4. Check the result: CORRECT and exit code 0 mean that the sorted file is right
+# Check the result: CORRECT and exit code 0 mean that the sorted file is right
 publish/checker/FileSort.Checker.exe --input data/test.txt --sorted data/sorted.txt
 ```
 
-The generator and the checker run without .NET, so they can be copied to another machine. The sorter runs on the
-installed .NET: on .NET 10 where there is one, otherwise on the next major version, such as the .NET 11 that comes
-with its SDK. Every program lists its options with `--help`. Other platforms, tests and running from source:
-[Build and run from source](#build-and-run-from-source).
+Each program carries its .NET runtime, and each lists its options with `--help`. To build the programs from source,
+run the tests or publish for another platform: [Build and run from source](#build-and-run-from-source).
 
 ## The problem
 
@@ -127,11 +123,20 @@ dotnet run -c Release --project FileSort.Checker -- --input data/test-1gb.txt --
 The exit code is 0 when the sorted file is correct, 4 when it is not and 3 when a file is not valid; the report
 says what was found.
 
-The generator and the checker can also be published as single executables that run on a machine without .NET
-installed (for example a QA machine), as in the [Quick start](#quick-start). For other platforms, use `linux-x64`,
-`osx-arm64` and so on in place of `win-x64`; any machine with the .NET SDK can publish for any of them. The sorter
-is published for the .NET runtime, `dotnet publish FileSort.Sorter -c Release -o publish/sorter`, and runs wherever
-.NET 10 or a newer .NET is installed. The published programs take the same options as `dotnet run`.
+Publish the programs into the folders of the [Quick start](#quick-start), as its release does:
+
+```powershell
+dotnet publish FileSort.Generator -c Release -r win-x64 -o publish/generator
+dotnet publish FileSort.Checker -c Release -r win-x64 -o publish/checker
+dotnet publish FileSort.Sorter -c Release -o publish/sorter
+```
+
+The generator and the checker are then single executables that run on a machine without .NET installed (for example
+a QA machine). For other platforms, use `linux-x64`, `osx-arm64` and so on in place of `win-x64`; any machine with
+the .NET SDK can publish for any of them. The sorter published this way runs on the installed .NET: on .NET 10 where
+there is one, otherwise on the next major version, such as the .NET 11 that comes with its SDK. The sorter of the
+release carries its runtime: `-r win-x64 --self-contained` publishes it so. The published programs take the same
+options as `dotnet run`.
 
 Disk space: a sort needs about twice the size of its input free, for the temporary runs and the output; with the
 input, about three times. For the 100 GB scenario, generation included, plan for about 300 GB.
@@ -155,7 +160,7 @@ input, about three times. For the 100 GB scenario, generation included, plan for
 | `Directory.Packages.props` | Central package versions |
 | `nuget.config` | Restores from nuget.org only, so the build does not depend on machine-level feeds |
 | `global.json` | Requires a .NET SDK 10.0.100 or newer (release versions only); runs tests on Microsoft.Testing.Platform |
-| `.github/` | GitHub Actions: build and tests with coverage, a workflow per program, and publishing the generator or the checker by hand, see [Continuous integration](#continuous-integration) |
+| `.github/` | GitHub Actions: build and tests with coverage, a workflow per program, and publishing a release of the three programs by hand, see [Continuous integration](#continuous-integration) |
 
 `FileSort.Checker` intentionally does not reference `FileSort.Common`. It parses and compares lines with its own
 deliberately simple code, so a bug in the optimized sorting code cannot be confirmed by that same code.
@@ -433,7 +438,8 @@ Notable decisions and their reasons, recorded as they are made.
   for the pair, why it checks in parallel) are in [its README](FileSort.Checker/README.md#design-decisions).
 - **Standalone generator and checker.** Test data is usually produced, and results checked, by QA engineers whose
   machines may not have .NET. The generator and the checker therefore publish as self-contained single executables;
-  the sorter runs on the regular .NET runtime. Options measured on a minimal build (win-x64):
+  the sorter, built from source, runs on the regular .NET runtime, and the release carries a runtime for it too.
+  Options measured on a minimal build (win-x64):
 
   | Publish mode | Size | Startup |
   |---|---|---|
@@ -510,13 +516,14 @@ GitHub Actions workflows live in `.github/workflows/`:
   run fails when the line coverage of the program's assemblies, taken together, is below 80%. Compiler messages
   appear as annotations on the changed lines. The test results (JUnit XML) and the coverage report (Cobertura) are
   attached to the run.
-- **Publish a program** (`publish.yml`) is started by hand, with the "Run workflow" button and with the program
-  (generator or checker) and the target platform as its inputs. It builds the self-contained executable and
-  attaches it to the run. For `win-x64` it also runs the executable: the generator must write the same bytes as
-  the regular build, and the checker must give exit code 0 for a correct pair and 4 for a broken one.
+- **Publish a release** (`publish.yml`) is started by hand, with the "Run workflow" button and the version as its
+  input. It builds the three programs for Windows x64, each with its .NET runtime, and checks them before it
+  publishes anything: the generator must write the bytes of the regular build, a file of 1 MB that the programs
+  generate, sort and check must come out correct, and the checker must give exit code 4 for a broken pair. Then it
+  publishes the release `v<version>` on that commit, with one archive that unpacks into the folders of the
+  [Quick start](#quick-start).
 
-The workflows run on Windows. The sorter is not published by `publish.yml`: it runs on the .NET runtime, and its
-build is the one that `dotnet publish` makes anywhere.
+The workflows run on Windows, and the release holds Windows x64 only: the one platform that its checks run on.
 
 ## Limitations and next steps
 
